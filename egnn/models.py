@@ -71,10 +71,6 @@ class EGNN_dynamics_QM9(nn.Module):
             h = torch.cat([h, h_time], dim=1) # [bs*n_nodes, h_dims+1]
 
         if context is not None:
-            print('context shape:', context.shape)
-            print('context:', context)
-            print('bs,n_nodes:', bs, n_nodes)
-            print('h', h)
             # We're conditioning, awesome!
             context = context.view(bs*n_nodes, self.context_node_nf)
             h = torch.cat([h, context], dim=1)
@@ -208,12 +204,7 @@ class EGNN_encoder_QM9(nn.Module):
             h = torch.ones(bs*n_nodes, 1).to(self.device)
         else:
             h = xh[:, self.n_dims:].clone()
-        print(f"self.context_node_nf : {self.context_node_nf}\n")
         if context is not None:
-            # We're conditioning, awesome!
-            print('context shape:', context.shape)
-            print('context:', context)
-            print('bs,n_nodes:', bs, n_nodes)
             # We're conditioning, awesome!
             context = context.view(bs*n_nodes, self.context_node_nf)
             h = torch.cat([h, context], dim=1)

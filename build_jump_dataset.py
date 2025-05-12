@@ -61,10 +61,18 @@ from qm9.data import collate as qm9_collate
     # print("Dataset processed.")
 
 
-def load_split_data(data_file, val_proportion=0.1, test_proportion=0.1,
-                    filter_size=None, seed=42):
-
-    # base_path = os.path.dirname(conformation_file)
+def load_split_data(data_file='charac.npy', val_proportion=0.1, test_proportion=0.1, filter_size=None, seed=42):
+    """Load and split data into train, validation and test sets.
+    Args:
+        data_file: Path to the numpy file containing molecular data
+        val_proportion: Proportion of validation data (default: 0.1)
+        test_proportion: Proportion of test data (default: 0.1)
+        filter_size: Maximum molecule size to include (default: None)
+        seed: Random seed (default: 42)
+    Returns:
+        train_data, val_data, test_data: Split lists
+    """
+    
     all_data = np.load(data_file, allow_pickle=True) 
     
     # Filter based on molecule size.
@@ -76,7 +84,8 @@ def load_split_data(data_file, val_proportion=0.1, test_proportion=0.1,
         assert len(all_data) > 0, 'No molecules left after filter.'
 
     # CAREFUL! Only for first time run:
-    perm = np.random.permutation(len(all_data), seed=seed).astype('int32')
+    np.random.seed(seed)
+    perm = np.random.permutation(len(all_data)).astype('int32')
     all_data = all_data[perm]
     
     num_mol = len(all_data)
@@ -165,7 +174,7 @@ def collate_fn(batch):
     return batch
 
 
-class GeomDrugsDataLoader(DataLoader):
+class JumpDataLoader(DataLoader):
     def __init__(self, sequential, dataset, batch_size, shuffle, drop_last=False):
 
         if sequential:
@@ -185,20 +194,22 @@ class GeomDrugsDataLoader(DataLoader):
                              collate_fn=collate_fn, drop_last=drop_last)
 
 
-class GeomDrugsTransform(object):
+class JumpTransform(object):
     def __init__(self, dataset_info, include_charges, device, sequential):
         self.atomic_number_list = torch.Tensor(dataset_info['atomic_nb'])[None, :]
         self.device = device
         self.include_charges = include_charges
         self.sequential = sequential
+        self.dataset_info = dataset_info
 
     def __call__(self, data):
         n = data.shape[0]
         new_data = {}
-        new_data['positions'] = torch.from_numpy(data[:, -3:])
-        atom_types = torch.from_numpy(data[:, 0].astype(int)[:, None])
-        one_hot = atom_types == self.atomic_number_list
+        new_data['positions'] = torch.from_numpy(data["positions"])
+        atom_letters = torch.from_numpy(data["atom_types"].astype(str)[:, None])
+        one_hot = atom_letters == self.atomic_number_list
         new_data['one_hot'] = one_hot
+        new_data['num_atoms'] = torch.tensor([n], size=(1,), device=self.device)
         if self.include_charges:
             new_data['charges'] = torch.zeros(n, 1, device=self.device)
         else:
@@ -220,4 +231,4 @@ if __name__ == '__main__':
     parser.add_argument("--data_dir", type=str, default='./data/geom/')
     parser.add_argument("--data_file", type=str, default="drugs_crude.msgpack")
     args = parser.parse_args()
-    extract_conformers(args)
+    # extract_conformers(args)

@@ -13,7 +13,7 @@ import argparse
 import wandb
 from configs.datasets_config import get_dataset_info
 from os.path import join
-from qm9 import dataset
+import build_jump_dataset
 from qm9.models import get_optim, get_model, get_autoencoder, get_latent_diffusion
 from equivariant_diffusion import en_diffusion
 from equivariant_diffusion.utils import assert_correctly_masked
@@ -137,6 +137,9 @@ parser.add_argument("--conditioning", nargs='+', default=[],
                     help='arguments : homo | lumo | alpha | gap | mu | Cv' )
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other') #maybe i should default to a no cond mode
+parser.add_argument('--data_file', type=str, default='charac.npy')
+parser.add_argument('--filter_molecule_size', type=int, default=None)
+parser.add_argument('--sequential', type=bool, default=False)
 
 args = parser.parse_args()
 
@@ -196,8 +199,24 @@ kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffus
 wandb.init(**kwargs)
 wandb.save('*.txt')
 
-# Retrieve QM9 dataloaders
-dataloaders, charge_scale = dataset.retrieve_dataloaders(args)
+
+# Build Jump Dataset
+split_data = build_jump_dataset.load_split_data(args.data_file, val_proportion=0.1, test_proportion=0.1, filter_size=args.filter_molecule_size)
+transform = build_jump_dataset.JumpTransform(dataset_info, args.include_charges, device, args.sequential)
+dataloaders = {}
+for key, data_list in zip(['train', 'val', 'test'], split_data):
+    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform)
+    shuffle = (key == 'train') and not args.sequential
+
+    # Sequential dataloading disabled for now.
+    dataloaders[key] = build_jump_dataset.JumpDataLoader(
+        sequential=args.sequential, dataset=dataset, batch_size=args.batch_size,
+        shuffle=shuffle)
+del split_data
+
+atom_encoder = dataset_info['atom_encoder']
+atom_decoder = dataset_info['atom_decoder']
+
 data_dummy = next(iter(dataloaders['train']))
 
 # Conditioning

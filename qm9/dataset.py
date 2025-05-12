@@ -35,6 +35,14 @@ def retrieve_dataloaders(cfg):
                                          num_workers=num_workers,
                                          collate_fn=preprocess.collate_fn)
                              for split, dataset in datasets.items()}
+    elif 'jump' in cfg.dataset:
+        batch_size = cfg.batch_size
+        batch_size = cfg.batch_size
+        num_workers = cfg.num_workers
+        filter_n_atoms = cfg.filter_n_atoms
+        # Initialize dataloader
+        args = init_argparse('jump')
+        print('Loading JUMP dataset')
     elif 'geom' in cfg.dataset:
         import build_geom_dataset
         from configs.datasets_config import get_dataset_info

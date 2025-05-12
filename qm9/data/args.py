@@ -208,6 +208,9 @@ def setup_argparse(dataset):
     elif dataset == "qm9":
         parser.add_argument('--subtract-thermo', action=BoolArg, default=True,
                             help='Subtract thermochemical energy from relvant learning targets in QM9 dataset.')
+    elif dataset == "jump":
+        parser.add_argument('--jump', action=BoolArg, default=True,
+                            help='Use JUMP dataset.')
     else:
         raise ValueError("Dataset is not recognized")
     return parser

@@ -103,6 +103,8 @@ def load_split_data(conformation_file, val_proportion=0.1, test_proportion=0.1,
     num_mol = len(data_list)
     val_index = int(num_mol * val_proportion)
     test_index = val_index + int(num_mol * test_proportion)
+    print(data_list)
+    print(val_index, test_index)
     val_data, test_data, train_data = np.split(data_list, [val_index, test_index])
     return train_data, val_data, test_data
 
@@ -168,7 +170,6 @@ class CustomBatchSampler(BatchSampler):
 def collate_fn(batch):
     batch = {prop: qm9_collate.batch_stack([mol[prop] for mol in batch])
              for prop in batch[0].keys()}
-
     atom_mask = batch['atom_mask']
 
     # Obtain edges

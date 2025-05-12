@@ -87,7 +87,7 @@ class EquivariantUpdate(nn.Module):
         row, col = edge_index # (i,j)
         input_tensor = torch.cat([h[row], h[col], edge_attr], dim=1)
         if self.tanh:
-            trans = coord_diff * torch.tanh(self.coord_mlp(input_tensor)) * self # ?
+            trans = coord_diff * torch.tanh(self.coord_mlp(input_tensor)) * self.coords_range # ?
         else:
             trans = coord_diff * self.coord_mlp(input_tensor)
         if edge_mask is not None:
