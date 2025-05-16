@@ -189,7 +189,6 @@ if __name__ == "__main__":
 
     model = get_model(args)
 
-    print(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs)

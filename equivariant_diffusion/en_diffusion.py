@@ -187,16 +187,12 @@ class PredefinedNoiseSchedule(torch.nn.Module):
         else:
             raise ValueError(noise_schedule)
 
-        print('alphas2', alphas2)
-
         sigmas2 = 1 - alphas2
 
         log_alphas2 = np.log(alphas2)
         log_sigmas2 = np.log(sigmas2)
 
         log_alphas2_to_sigmas2 = log_alphas2 - log_sigmas2
-
-        print('gamma', -log_alphas2_to_sigmas2)
 
         self.gamma = torch.nn.Parameter(
             torch.from_numpy(-log_alphas2_to_sigmas2).float(),
@@ -577,8 +573,8 @@ class EnVariationalDiffusion(torch.nn.Module):
             # estimator = loss_t,           where t ~ U({0, ..., T})
             lowest_t = 0
 
-        # Sample a timestep t.
-        t_int = torch.randint(
+        # Sample a timestep t for every molecule in the batch
+        t_int = torch.randint( # [bs, 1]
             lowest_t, self.T + 1, size=(x.size(0), 1), device=x.device).float()
         s_int = t_int - 1
         t_is_zero = (t_int == 0).float()  # Important to compute log p(x | z0).
@@ -596,8 +592,8 @@ class EnVariationalDiffusion(torch.nn.Module):
         alpha_t = self.alpha(gamma_t, x)
         sigma_t = self.sigma(gamma_t, x)
 
-        # Sample zt ~ Normal(alpha_t x, sigma_t)
-        eps = self.sample_combined_position_feature_noise(
+        # Sample eps ~ Normal(alpha_t x, sigma_t)
+        eps = self.sample_combined_position_feature_noise( # True sampled noise [bs, n_nodes, 3+latent_nf]
             n_samples=x.size(0), n_nodes=x.size(1), node_mask=node_mask)
 
         # Concatenate x, h[integer] and h[categorical].
@@ -610,7 +606,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         # Neural net prediction.
         net_out = self.phi(z_t, t, node_mask, edge_mask, context)
 
-        # Compute the error.
+        # Compute the mean square error between predicted noise and og noise.
         error = self.compute_error(net_out, gamma_t, eps)
 
         if self.training and self.loss_type == 'l2':
@@ -629,7 +625,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         if self.training and self.loss_type == 'l2':
             neg_log_constants = torch.zeros_like(neg_log_constants)
 
-        # The KL between q(z1 | x) and p(z1) = Normal(0, 1). Should be close to zero.
+        # The KL between q(z1 | x) and p(z1) = Normal(0, 1). Should be close to zero. Not super useful
         kl_prior = self.kl_prior(xh, node_mask)
 
         # Combining the terms
@@ -929,7 +925,7 @@ class EnHierarchicalVAE(torch.nn.Module):
         """Samples from a Normal distribution."""
         bs = 1 if fix_noise else mu.size(0)
         eps = self.sample_combined_position_feature_noise(bs, mu.size(1), node_mask)
-        return mu + sigma * eps
+        return mu + sigma * eps # zh_mean
     
     def compute_loss(self, x, h, node_mask, edge_mask, context):
         """Computes an estimator for the variational lower bound."""
@@ -998,7 +994,7 @@ class EnHierarchicalVAE(torch.nn.Module):
         return z
     
     def encode(self, x, h, node_mask=None, edge_mask=None, context=None):
-        """Computes q(z|x)."""
+        """Computes q(z|x) in the context of the autoencoder."""
 
         # Concatenate x, h[integer] and h[categorical].
         xh = torch.cat([x, h['categorical'], h['integer']], dim=2)
@@ -1171,6 +1167,7 @@ class EnLatentDiffusion(EnVariationalDiffusion):
         # Make the data structure compatible with the EnVariationalDiffusion compute_loss().
         z_h = {'categorical': torch.zeros(0).to(z_h), 'integer': z_h}
 
+        # Diffusion model loss
         if self.training:
             # Only 1 forward pass when t0_always is False.
             loss_ld, loss_dict = self.compute_loss(z_x, z_h, node_mask, edge_mask, context, t0_always=False)

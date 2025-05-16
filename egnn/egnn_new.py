@@ -132,7 +132,6 @@ class EquivariantBlock(nn.Module):
         self.to(self.device)
 
     def forward(self, h, x, edge_index, node_mask=None, edge_mask=None, edge_attr=None):
-        # Edit Emiel: Remove velocity as input
         distances, coord_diff = coord2diff(x, edge_index, self.norm_constant)
         if self.sin_embedding is not None:
             distances = self.sin_embedding(distances)
@@ -145,6 +144,21 @@ class EquivariantBlock(nn.Module):
         if node_mask is not None:
             h = h * node_mask
         return h, x
+
+# class CrossAttentionBlock(nn.Module):
+#     def __init__(self, embed_dim, n_heads, dropout=0.1, batch_first=True, device='cpu',
+#                  node_mask, edge_mask):
+#         super(CrossAttentionBlock, self).__init__()
+#         self.attention = nn.MultiheadAttention(
+#             embed_dim=embed_dim,
+#             num_heads=n_heads,
+#             dropout=dropout,
+#             batch_first=batch_first,
+#             device=device
+#         )
+        
+#     def forward(self, query, key, value, attn_mask=None):
+#         return self.attention(query, key, value, attn_mask=attn_mask)[0]
 
 
 class EGNN(nn.Module):
@@ -186,7 +200,7 @@ class EGNN(nn.Module):
         distances, _ = coord2diff(x, edge_index)
         if self.sin_embedding is not None:
             distances = self.sin_embedding(distances)
-        h = self.embedding(h)
+        h = self.embedding(h) 
         for i in range(0, self.n_layers):
             h, x = self._modules["e_block_%d" % i](h, x, edge_index, node_mask=node_mask, edge_mask=edge_mask, edge_attr=distances)
 
@@ -195,6 +209,7 @@ class EGNN(nn.Module):
         if node_mask is not None:
             h = h * node_mask
         return h, x
+
 
 
 class GNN(nn.Module):

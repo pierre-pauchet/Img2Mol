@@ -58,7 +58,7 @@ parser.add_argument('--diffusion_loss_type', type=str, default='l2',
                     help='vlb, l2')
 
 parser.add_argument('--n_epochs', type=int, default=200)
-parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--batch_size', type=int, default=32)
 parser.add_argument('--lr', type=float, default=2e-4)
 parser.add_argument('--brute_force', type=eval, default=False,
                     help='True | False')
@@ -111,6 +111,7 @@ parser.add_argument('--num_workers', type=int, default=4, help='Number of worker
 parser.add_argument('--test_epochs', type=int, default=10)
 parser.add_argument('--resume', type=str, default=None,
                     help='')
+
 parser.add_argument('--start_epoch', type=int, default=0,
                     help='')
 parser.add_argument('--ema_decay', type=float, default=0.999,
@@ -133,11 +134,11 @@ parser.add_argument('--aggregation_method', type=str, default='sum',
 # Mine
 parser.add_argument('--data_augmentation', type=eval, default=False, help='use attention in the EGNN')
 parser.add_argument('--embeddings_data_dir', type=str, default='CondGeoLDM/data/jump_data')
-parser.add_argument("--conditioning", nargs='+', default=[],
+parser.add_argument("--conditioning", nargs='+', default=['alpha'],
                     help='arguments : homo | lumo | alpha | gap | mu | Cv' )
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other') #maybe i should default to a no cond mode
-parser.add_argument('--data_file', type=str, default='charac.npy')
+parser.add_argument('--data_file', type=str, default='/projects/iktos/pierre/CondGeoLDM/charac.npy')
 parser.add_argument('--filter_molecule_size', type=int, default=None)
 parser.add_argument('--sequential', type=bool, default=False)
 
@@ -204,7 +205,7 @@ wandb.save('*.txt')
 split_data = build_jump_dataset.load_split_data(args.data_file, val_proportion=0.1, test_proportion=0.1, filter_size=args.filter_molecule_size)
 transform = build_jump_dataset.JumpTransform(dataset_info, args.include_charges, device, args.sequential)
 dataloaders = {}
-for key, data_list in zip(['train', 'val', 'test'], split_data):
+for key, data_list in zip(['train', 'valid', 'test'], split_data):
     dataset = build_jump_dataset.JumpDataset(data_list, transform=transform)
     shuffle = (key == 'train') and not args.sequential
 
@@ -270,6 +271,7 @@ def check_mask_correct(variables, node_mask):
 
 
 def main():
+    print(args)
     if args.resume is not None:
         flow_state_dict = torch.load(join(args.resume, 'flow.npy'))
         optim_state_dict = torch.load(join(args.resume, 'optim.npy'))

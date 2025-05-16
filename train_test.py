@@ -19,6 +19,7 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
     nll_epoch = []
     n_iterations = len(loader)
     for i, data in enumerate(loader):
+
         x = data['positions'].to(device, dtype)
         node_mask = data['atom_mask'].to(device, dtype).unsqueeze(2)
         edge_mask = data['edge_mask'].to(device, dtype)

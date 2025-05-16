@@ -49,8 +49,8 @@ class EGNN_dynamics_QM9(nn.Module):
     def _forward(self, t, xh, node_mask, edge_mask, context):
         bs, n_nodes, dims = xh.shape # ex [128,24,4]
         h_dims = dims - self.n_dims 
-        edges = self.get_adj_matrix(n_nodes, bs, self.device) # [2, n_nodes*n_nodes]
-        edges = [x.to(self.device) for x in edges]
+        edges = self.get_adj_matrix(n_nodes, bs, self.device) # [2, bs*n_nodes*n_nodes]
+        edges = [x.to(self.device) for x in edges] # list[bs*n_nodes*n_nodes, bs*n_nodes*n_nodes]
         node_mask = node_mask.view(bs*n_nodes, 1) # [bs*n_nodes, 1]
         edge_mask = edge_mask.view(bs*n_nodes*n_nodes, 1) # [bs*n_nodes*n_nodes, 1]
         xh = xh.view(bs*n_nodes, -1).clone() * node_mask

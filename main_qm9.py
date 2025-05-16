@@ -28,7 +28,7 @@ parser.add_argument('--exp_name', type=str, default='')
 
 
 # Latent Diffusion args
-parser.add_argument('--train_diffusion', action='store_true', 
+parser.add_argument('--train_diffusion', default=True, action='store_true', 
                     help='Train second stage LatentDiffusionModel model')
 parser.add_argument('--ae_path', type=str, default=None,
                     help='Specify first stage model path')
@@ -57,7 +57,7 @@ parser.add_argument('--diffusion_loss_type', type=str, default='l2',
                     help='vlb, l2')
 
 parser.add_argument('--n_epochs', type=int, default=200)
-parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--batch_size', type=int, default=256)
 parser.add_argument('--lr', type=float, default=2e-4)
 parser.add_argument('--brute_force', type=eval, default=False,
                     help='True | False')
@@ -133,11 +133,12 @@ parser.add_argument('--aggregation_method', type=str, default='sum',
                     help='"sum" or "mean"')
 # Mine
 parser.add_argument('--data_augmentation', type=eval, default=False, help='use attention in the EGNN')
-parser.add_argument('--embeddings_data_dir', type=str, default='data/jump_data')
-parser.add_argument("--conditioning", nargs='+', default=[],
+parser.add_argument('--embedding_data_dir', type=str, default='data/jump_data')
+parser.add_argument("--conditioning", nargs='+', default=['alpha'],
                     help='arguments : homo | lumo | alpha | gap | mu | Cv' )
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other') #maybe i should default to a no cond mode
+
 
 args = parser.parse_args()
 
@@ -184,7 +185,7 @@ utils.create_folders(args)
 
 # Embeddings for conditioning
 if args.conditioning_mode in ['naive', 'attention']:
-    embeddings, metadata = load_embeddings(args.embeddings_data_dir)
+    embeddings, metadata = load_embeddings(args.embedding_data_dir)
     
     
 # Wandb config
@@ -212,7 +213,7 @@ elif args.conditioning_mode == 'naive': # Naive conditioning
     property_norms = compute_mean_mad(dataloaders, args.conditioning, args.dataset)
     context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
     embeddings = prepare_embeddings(embeddings, metadata, data_dummy)
-    context_node_nf = embeddings.size(2)
+    context_node_nf = embeddings.shape(2)
 elif args.conditioning_mode in ['attention', 'other']: # Attention conditioning
     raise NotImplementedError('Attention conditioning not implemented yet')
 else: # No conditioning
@@ -234,7 +235,6 @@ if prop_dist is not None:
     prop_dist.set_normalizer(property_norms)
 model = model.to(device)
 optim = get_optim(args, model)
-# print(model)
 
 gradnorm_queue = utils.Queue()
 gradnorm_queue.add(3000)  # Add large value that will be flushed.

@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 def compute_mean_mad(dataloaders, properties, dataset_name):
-    if dataset_name == "qm9":
+    if dataset_name in ["qm9", "jump"]:
         return compute_mean_mad_from_dataloader(dataloaders["train"], properties)
     elif dataset_name == "qm9_second_half" or dataset_name == "qm9_second_half":
         return compute_mean_mad_from_dataloader(dataloaders["valid"], properties)
@@ -130,13 +130,8 @@ def prepare_embeddings(embeddings, metadata, minibatch, verbose=False):
         print(f"Emeddings cont shape: {context.shape}")
         print(f"Embeddings as context: {context}")
     context = context * node_mask
-    context = context.unsqueeze(2)
+    # context = context.unsqueeze(2)
     
     print("Context shape:", context.shape)
     print('DONE')
     return context
-    if verbose:
-        print(f"batch_size: {batch_size}, n_nodes: {n_nodes}")
-        print(f"node_mask shape: {node_mask.shape}")
-
-    return None

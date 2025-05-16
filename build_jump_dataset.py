@@ -103,9 +103,9 @@ class JumpDataset(Dataset):
                 on a sample.
         """
         self.transform = transform
-
+    
         # Sort the data list by size
-        lengths = [mol.shape[0] for mol in data_list["atom_types"]]
+        lengths = [len(mol["atom_types"]) for mol in data_list]
         argsort = np.argsort(lengths)               # Sort by decreasing size
         self.data_list = [data_list[i] for i in argsort]
         # Store indices where the size changes
@@ -196,20 +196,23 @@ class JumpDataLoader(DataLoader):
 
 class JumpTransform(object):
     def __init__(self, dataset_info, include_charges, device, sequential):
-        self.atomic_number_list = torch.Tensor(dataset_info['atomic_nb'])[None, :]
+        self.atomic_decoder = torch.Tensor(list(dataset_info['atom_encoder'].values()))[None, :]
         self.device = device
         self.include_charges = include_charges
         self.sequential = sequential
         self.dataset_info = dataset_info
 
     def __call__(self, data):
-        n = data.shape[0]
+        n = len(data["atom_types"])
         new_data = {}
         new_data['positions'] = torch.from_numpy(data["positions"])
-        atom_letters = torch.from_numpy(data["atom_types"].astype(str)[:, None])
-        one_hot = atom_letters == self.atomic_number_list
+        atom_letters = data["atom_types"]
+        atom_numbers_np = [self.dataset_info['atom_encoder'][letter] for letter in atom_letters]
+        atom_numbers = torch.tensor(atom_numbers_np).unsqueeze(1)
+        
+        one_hot = atom_numbers == self.atomic_decoder
         new_data['one_hot'] = one_hot
-        new_data['num_atoms'] = torch.tensor([n], size=(1,), device=self.device)
+        new_data['num_atoms'] = torch.tensor([n], device=self.device).unsqueeze(1)
         if self.include_charges:
             new_data['charges'] = torch.zeros(n, 1, device=self.device)
         else:
@@ -230,5 +233,13 @@ if __name__ == '__main__':
     parser.add_argument("--remove_h", action='store_true', help="Remove hydrogens from the dataset.")
     parser.add_argument("--data_dir", type=str, default='./data/geom/')
     parser.add_argument("--data_file", type=str, default="drugs_crude.msgpack")
-    args = parser.parse_args()
-    # extract_conformers(args)
+
+    try:
+
+      args = parser.parse_args()  
+    except SystemExit:
+        # Print help message here if needed
+        parser.print_help()
+        raise  # Re-raise the exception if you still want to exit
+        # extract_conformers(args)
+        
