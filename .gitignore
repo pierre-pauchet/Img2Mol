@@ -1,11 +1,11 @@
 *__pycache__*
 *.pyc
-data/*
+data/geom/*
 .idea*
 bash.sh
 kohler/cache/*
 *.ipynb
-.
+!data/geom/README.md
 *.log
 *wandb*
 *.DS_Store*
@@ -36,3 +36,6 @@ charac.npy
 pyproject.toml
 bugged_ids_during_3d_generation.npy
 requirements.txt
+data/jump_data/metadata.parquet
+data/jump_data/metadata.parquet
+data/jump_data/Embeddings_norm.npy
