@@ -72,8 +72,9 @@ def load_split_data(conformation_file, val_proportion=0.1, test_proportion=0.1,
     base_path = path.parent.absolute()
 
     # base_path = os.path.dirname(conformation_file)
+    print("Loading conformations from", conformation_file)
     all_data = np.load(conformation_file)  # 2d array: num_atoms x 5
-
+    print("Total number of conformers loaded", all_data.shape[0])
     mol_id = all_data[:, 0].astype(int)
     conformers = all_data[:, 1:]
     # Get ids corresponding to new molecules
@@ -103,9 +104,9 @@ def load_split_data(conformation_file, val_proportion=0.1, test_proportion=0.1,
     num_mol = len(data_list)
     val_index = int(num_mol * val_proportion)
     test_index = val_index + int(num_mol * test_proportion)
-    print(data_list)
-    print(val_index, test_index)
-    val_data, test_data, train_data = np.split(data_list, [val_index, test_index])
+    train_data = data_list[:val_index]
+    val_data = data_list[val_index:test_index]
+    test_data = data_list[test_index:]
     return train_data, val_data, test_data
 
 
