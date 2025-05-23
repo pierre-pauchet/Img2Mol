@@ -14,7 +14,7 @@ import wandb
 from configs.datasets_config import get_dataset_info
 from os.path import join
 import build_jump_dataset
-from qm9.models import get_optim, get_model, get_autoencoder, get_latent_diffusion
+from qm9.models import get_optim, get_autoencoder, get_latent_diffusion
 from equivariant_diffusion import en_diffusion
 from equivariant_diffusion.utils import assert_correctly_masked
 from equivariant_diffusion import utils as flow_utils
@@ -57,9 +57,9 @@ parser.add_argument('--diffusion_noise_precision', type=float, default=1e-5,
 parser.add_argument('--diffusion_loss_type', type=str, default='l2',
                     help='vlb, l2')
 
-parser.add_argument('--n_epochs', type=int, default=200)
+parser.add_argument('--n_epochs', type=int, default=20)
 parser.add_argument('--batch_size', type=int, default=32)
-parser.add_argument('--lr', type=float, default=2e-4)
+parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--brute_force', type=eval, default=False,
                     help='True | False')
 parser.add_argument('--actnorm', type=eval, default=True,

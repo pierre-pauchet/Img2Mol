@@ -10,7 +10,7 @@ import qm9.utils as qm9utils
 from qm9 import losses
 import time
 import torch
-
+import tqdm
 
 def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dtype, property_norms, optim,
                 nodes_dist, gradnorm_queue, dataset_info, prop_dist):
@@ -182,7 +182,7 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
     batch_size = min(batch_size, n_samples)
     assert n_samples % batch_size == 0
     molecules = {'one_hot': [], 'x': [], 'node_mask': []}
-    for i in range(int(n_samples/batch_size)):
+    for i in tqdm.tqdm(range(int(n_samples/batch_size))):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(args, device, model_sample, dataset_info, prop_dist,
                                                 nodesxsample=nodesxsample)
