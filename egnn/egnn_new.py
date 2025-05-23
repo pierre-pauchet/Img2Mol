@@ -31,7 +31,7 @@ class GCL(nn.Module):
         if self.cross_attn:
             self.cross_attn_block = nn.MultiheadAttention(
                 embed_dim=hidden_nf,
-                num_heads=1, # Might play around with this later
+                num_heads=2, # Might play around with this later
                 dropout=0.1,
                 batch_first=True,
             )
@@ -48,8 +48,7 @@ class GCL(nn.Module):
             att_val = self.att_mlp(mij)
             out = mij * att_val
         elif self.cross_attn:
-            out, attn_weights = self.cross_attn_block(mij
-                                                      , phenotypes, phenotypes) # X_Att between messages and phenotypes
+            out, attn_weights = self.cross_attn_block(mij, phenotypes, phenotypes) # X_Att between messages and phenotypes
         else:
             out = mij
 
