@@ -1,5 +1,5 @@
 # Bond lengths from:
-# http://www.wiredchemist.com/chemistry/data/bond_energies_lengths.html
+# http://www.wiredchemist.com/chemisImplémenter la possiblité de faire tourner sur un subset : modifier le paramètre n_debug_samples, hard codé dans le main try/data/bond_energies_lengths.html
 # And:
 # http://chemistry-reference.com/tables/Bond%20Lengths%20and%20Enthalpies.pdf
 bonds1 = {'H': {'H': 74, 'C': 109, 'N': 101, 'O': 96, 'F': 92,
@@ -31,7 +31,11 @@ bonds1 = {'H': {'H': 74, 'C': 109, 'N': 101, 'O': 96, 'F': 92,
                 'S': 210, 'F': 156, 'N': 177, 'Br': 222},
           'I': {'H': 161, 'C': 214, 'Si': 243, 'N': 222, 'O': 194,
                 'S': 234, 'F': 187, 'I': 266},
-          'As': {'H': 152}
+          'As': {'H': 152},
+          'Na': {},
+          'Hg' : {},
+          'Mo' : {},
+          'K' : {},# TODO : Add Na ionic bond length OR remove Na from the dataset
           }
 
 bonds2 = {'C': {'C': 134, 'N': 129, 'O': 120, 'S': 160},
@@ -95,7 +99,7 @@ margin1, margin2, margin3 = 10, 5, 3
 allowed_bonds = {'H': 1, 'C': 4, 'N': 3, 'O': 2, 'F': 1, 'B': 3, 'Al': 3,
                  'Si': 4, 'P': [3, 5],
                  'S': 4, 'Cl': 1, 'As': 3, 'Br': 1, 'I': 1, 'Hg': [1, 2],
-                 'Bi': [3, 5]}
+                 'Bi': [3, 5], 'Se':1, 'Sn':1, 'Na':1}
 
 
 def get_bond_order(atom1, atom2, distance, check_exists=False):

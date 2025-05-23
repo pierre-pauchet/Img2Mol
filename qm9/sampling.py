@@ -55,8 +55,9 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
     n_samples = 1
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
-    elif args.dataset == 'geom':
+    elif args.dataset == 'geom' or args.dataset == 'jump':
         n_nodes = 44
+
     else:
         raise ValueError()
 
@@ -67,16 +68,16 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
         #context = torch.zeros(n_samples, n_nodes, args.context_node_nf).to(device)
     else:
         context = None
-
+    phenotypes = None
     node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
 
     edge_mask = (1 - torch.eye(n_nodes)).unsqueeze(0)
     edge_mask = edge_mask.repeat(n_samples, 1, 1).view(-1, 1).to(device)
-
+    keep_frames = min(100, args.n_stability_samples)
     if args.probabilistic_model == 'diffusion':
         one_hot, charges, x = None, None, None
         for i in range(n_tries):
-            chain = flow.sample_chain(n_samples, n_nodes, node_mask, edge_mask, context, keep_frames=100)
+            chain = flow.sample_chain(n_samples, n_nodes, node_mask, edge_mask, context, phenotypes, keep_frames=keep_frames)
             chain = reverse_tensor(chain)
 
             # Repeat last frame to see final sample better.
@@ -108,7 +109,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
 
 
 def sample(args, device, generative_model, dataset_info,
-           prop_dist=None, nodesxsample=torch.tensor([10]), context=None,
+           prop_dist=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
            fix_noise=False):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
 
@@ -134,9 +135,10 @@ def sample(args, device, generative_model, dataset_info,
         context = context.unsqueeze(1).repeat(1, max_n_nodes, 1).to(device) * node_mask
     else:
         context = None
-
+    phenotypes = None
+    
     if args.probabilistic_model == 'diffusion':
-        x, h = generative_model.sample(batch_size, max_n_nodes, node_mask, edge_mask, context, fix_noise=fix_noise)
+        x, h = generative_model.sample(batch_size, max_n_nodes, node_mask, edge_mask, context, phenotypes, fix_noise=fix_noise)
 
         assert_correctly_masked(x, node_mask)
         assert_mean_zero_with_mask(x, node_mask)

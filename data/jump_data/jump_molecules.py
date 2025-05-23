@@ -10,14 +10,19 @@ from rdkit import RDLogger
 
 
 # Read the Parquet file
-metadata = pd.read_parquet('CondGeoLDM/data/jump_data/metadata.parquet')
+metadata = pd.read_parquet('/projects/iktos/pierre/CondGeoLDM/data/jump_data/metadata.parquet')
 metadata.set_index(metadata.Metadata_InChI_ID, inplace=True, drop=True)
 metadata = metadata.drop(columns=['Metadata_InChI_ID', 'Metadata_Is_dmso'])
 
 
 # Load the embeddings from the .npy file
-with open('CondGeoLDM/data/jump_data/Embeddings_norm.npy', 'rb') as f:
+with open('/projects/iktos/pierre/CondGeoLDM/data/jump_data/Embeddings_norm.npy', 'rb') as f:
     embeddings = np.load(f)
+embeddings = pd.DataFrame(embeddings, dtype=np.float16)
+
+# Fuse embeddings and metadata
+embeddings_list = [embeddings.iloc[i].tolist() for i in range(embeddings.shape[0])]
+metadata['Embeddings'] = embeddings_list 
 
 # Disable RDKit warnings (we generate without hydrogens, and it makes it very grumpy)
 RDLogger.DisableLog('rdApp.warning')
@@ -65,6 +70,7 @@ def get_molecular_characteristics(metadata):
             "charges": np.array(charges),
             "positions": positions,
             "atom_types": atom_types,
+            "embeddings": metadata.Embeddings[i],
         })
         del mol, mol_with_h, conf # Not sure if this is necessary
     return characteristics, bugged_ids_during_3d_generation

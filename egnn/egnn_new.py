@@ -3,13 +3,14 @@ import torch
 import math
 
 class GCL(nn.Module):
-    def __init__(self, input_nf, output_nf, hidden_nf, normalization_factor, aggregation_method,
-                 edges_in_d=0, nodes_att_dim=0, act_fn=nn.SiLU(), attention=False):
+    def __init__(self, input_nf, output_nf, hidden_nf, normalization_factor, aggregation_method, 
+                 edges_in_d=0, nodes_att_dim=0, act_fn=nn.SiLU(), attention=False, cross_attn=False):
         super(GCL, self).__init__()
         input_edge = input_nf * 2
         self.normalization_factor = normalization_factor
         self.aggregation_method = aggregation_method
         self.attention = attention
+        self.cross_attn = cross_attn
 
         self.edge_mlp = nn.Sequential(
             nn.Linear(input_edge + edges_in_d, hidden_nf),
@@ -26,8 +27,17 @@ class GCL(nn.Module):
             self.att_mlp = nn.Sequential(
                 nn.Linear(hidden_nf, 1),
                 nn.Sigmoid())
-
-    def edge_model(self, source, target, edge_attr, edge_mask):
+            
+        if self.cross_attn:
+            self.cross_attn_block = nn.MultiheadAttention(
+                embed_dim=hidden_nf,
+                num_heads=1, # Might play around with this later
+                dropout=0.1,
+                batch_first=True,
+            )
+            
+        
+    def edge_model(self, source, target, edge_attr, edge_mask, phenotypes=None):
         if edge_attr is None:  # Unused.
             out = torch.cat([source, target], dim=1)
         else:
@@ -37,6 +47,9 @@ class GCL(nn.Module):
         if self.attention:
             att_val = self.att_mlp(mij)
             out = mij * att_val
+        elif self.cross_attn:
+            out, attn_weights = self.cross_attn_block(mij
+                                                      , phenotypes, phenotypes) # X_Att between messages and phenotypes
         else:
             out = mij
 
@@ -56,13 +69,29 @@ class GCL(nn.Module):
         out = x + self.node_mlp(agg)
         return out, agg
 
-    def forward(self, h, edge_index, edge_attr=None, node_attr=None, node_mask=None, edge_mask=None):
+    def forward(self, h, edge_index, edge_attr=None, node_attr=None, node_mask=None, edge_mask=None, phenotypes=None):
         row, col = edge_index
-        edge_feat, mij = self.edge_model(h[row], h[col], edge_attr, edge_mask)
+        edge_feat, mij = self.edge_model(h[row], h[col], edge_attr, edge_mask, phenotypes)
         h, agg = self.node_model(h, edge_index, edge_feat, node_attr)
         if node_mask is not None:
             h = h * node_mask
         return h, mij
+    
+# class CrossAttentionBlock(nn.Module):
+#     def __init__(self, node_mask, edge_mask, embed_dim, n_heads=1, dropout=0.1, 
+#                  batch_first=True, device='cpu'):
+                 
+#         super(CrossAttentionBlock, self).__init__()
+#         self.node_mask = node_mask
+#         self.edge_mask = edge_mask
+#         self.embed_dim = embed_dim
+#         self.n_heads = n_heads
+#         self.dropout = dropout
+
+        
+#     def forward(self, query, key, value, attn_mask=None):
+#         attn_output, attn_output_weights = self.cross_attn(query, key, value)
+#         return attn_output, attn_output_weights
 
 
 class EquivariantUpdate(nn.Module):
@@ -105,10 +134,11 @@ class EquivariantUpdate(nn.Module):
         return coord
 
 
+
 class EquivariantBlock(nn.Module):
     def __init__(self, hidden_nf, edge_feat_nf=2, device='cpu', act_fn=nn.SiLU(), n_layers=2, attention=True,
                  norm_diff=True, tanh=False, coords_range=15, norm_constant=1, sin_embedding=None,
-                 normalization_factor=100, aggregation_method='sum'):
+                 normalization_factor=100, aggregation_method='sum', cross_attn=False):
         super(EquivariantBlock, self).__init__()
         self.hidden_nf = hidden_nf
         self.device = device
@@ -119,25 +149,27 @@ class EquivariantBlock(nn.Module):
         self.sin_embedding = sin_embedding
         self.normalization_factor = normalization_factor
         self.aggregation_method = aggregation_method
+        self.cross_attn = cross_attn
 
         for i in range(0, n_layers):
             self.add_module("gcl_%d" % i, GCL(self.hidden_nf, self.hidden_nf, self.hidden_nf, edges_in_d=edge_feat_nf,
                                               act_fn=act_fn, attention=attention,
                                               normalization_factor=self.normalization_factor,
-                                              aggregation_method=self.aggregation_method))
+                                              aggregation_method=self.aggregation_method,
+                                              cross_attn=self.cross_attn))
         self.add_module("gcl_equiv", EquivariantUpdate(hidden_nf, edges_in_d=edge_feat_nf, act_fn=nn.SiLU(), tanh=tanh,
                                                        coords_range=self.coords_range_layer,
                                                        normalization_factor=self.normalization_factor,
                                                        aggregation_method=self.aggregation_method))
         self.to(self.device)
 
-    def forward(self, h, x, edge_index, node_mask=None, edge_mask=None, edge_attr=None):
+    def forward(self, h, x, edge_index, node_mask=None, edge_mask=None, edge_attr=None, phenotypes=None):
         distances, coord_diff = coord2diff(x, edge_index, self.norm_constant)
         if self.sin_embedding is not None:
             distances = self.sin_embedding(distances)
         edge_attr = torch.cat([distances, edge_attr], dim=1)
         for i in range(0, self.n_layers):
-            h, _ = self._modules["gcl_%d" % i](h, edge_index, edge_attr=edge_attr, node_mask=node_mask, edge_mask=edge_mask)
+            h, _ = self._modules["gcl_%d" % i](h, edge_index, edge_attr=edge_attr, node_mask=node_mask, edge_mask=edge_mask, phenotypes=phenotypes)
         x = self._modules["gcl_equiv"](h, x, edge_index, coord_diff, edge_attr, node_mask, edge_mask)
 
         # Important, the bias of the last linear might be non-zero
@@ -145,26 +177,12 @@ class EquivariantBlock(nn.Module):
             h = h * node_mask
         return h, x
 
-# class CrossAttentionBlock(nn.Module):
-#     def __init__(self, embed_dim, n_heads, dropout=0.1, batch_first=True, device='cpu',
-#                  node_mask, edge_mask):
-#         super(CrossAttentionBlock, self).__init__()
-#         self.attention = nn.MultiheadAttention(
-#             embed_dim=embed_dim,
-#             num_heads=n_heads,
-#             dropout=dropout,
-#             batch_first=batch_first,
-#             device=device
-#         )
-        
-#     def forward(self, query, key, value, attn_mask=None):
-#         return self.attention(query, key, value, attn_mask=attn_mask)[0]
 
 
 class EGNN(nn.Module):
     def __init__(self, in_node_nf, in_edge_nf, hidden_nf, device='cpu', act_fn=nn.SiLU(), n_layers=3, attention=False,
                  norm_diff=True, out_node_nf=None, tanh=False, coords_range=15, norm_constant=1, inv_sublayers=2,
-                 sin_embedding=False, normalization_factor=100, aggregation_method='sum'):
+                 sin_embedding=False, normalization_factor=100, aggregation_method='sum', cross_attn=False):
         super(EGNN, self).__init__()
         if out_node_nf is None:
             out_node_nf = in_node_nf
@@ -175,7 +193,8 @@ class EGNN(nn.Module):
         self.norm_diff = norm_diff
         self.normalization_factor = normalization_factor
         self.aggregation_method = aggregation_method
-
+        self.cross_attn = cross_attn
+        
         if sin_embedding:
             self.sin_embedding = SinusoidsEmbeddingNew()
             edge_feat_nf = self.sin_embedding.dim * 2
@@ -192,17 +211,18 @@ class EGNN(nn.Module):
                                                                coords_range=coords_range, norm_constant=norm_constant,
                                                                sin_embedding=self.sin_embedding,
                                                                normalization_factor=self.normalization_factor,
-                                                               aggregation_method=self.aggregation_method))
+                                                               aggregation_method=self.aggregation_method,
+                                                               cross_attn=self.cross_attn))
         self.to(self.device)
 
-    def forward(self, h, x, edge_index, node_mask=None, edge_mask=None):
+    def forward(self, h, x, edge_index, node_mask=None, edge_mask=None, phenotypes=None):
         # Edit Emiel: Remove velocity as input
         distances, _ = coord2diff(x, edge_index)
         if self.sin_embedding is not None:
             distances = self.sin_embedding(distances)
         h = self.embedding(h) 
         for i in range(0, self.n_layers):
-            h, x = self._modules["e_block_%d" % i](h, x, edge_index, node_mask=node_mask, edge_mask=edge_mask, edge_attr=distances)
+            h, x = self._modules["e_block_%d" % i](h, x, edge_index, node_mask=node_mask, edge_mask=edge_mask, edge_attr=distances, phenotypes=phenotypes)
 
         # Important, the bias of the last linear might be non-zero
         h = self.embedding_out(h)

@@ -2,7 +2,7 @@ import msgpack
 import os
 import numpy as np
 import torch
-from torch.utils.data import BatchSampler, DataLoader, Dataset, SequentialSampler
+from torch.utils.data import BatchSampler, DataLoader, Dataset, SequentialSampler, Subset
 import argparse
 from qm9.data import collate as qm9_collate
 
@@ -88,6 +88,7 @@ def load_split_data(data_file='charac.npy', val_proportion=0.1, test_proportion=
     perm = np.random.permutation(len(all_data)).astype('int32')
     all_data = all_data[perm]
     
+    
     num_mol = len(all_data)
     val_index = int(num_mol * val_proportion)
     test_index = val_index + int(num_mol * test_proportion)
@@ -96,20 +97,25 @@ def load_split_data(data_file='charac.npy', val_proportion=0.1, test_proportion=
 
 
 class JumpDataset(Dataset):
-    def __init__(self, data_list, transform=None):
+    def __init__(self, data_list, transform=None, n_debug_samples=None):
         """
         Args:
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
         self.transform = transform
-    
+        if n_debug_samples is not None:
+            end_index = min(n_debug_samples, len(data_list))
+            data_list = data_list[:end_index]
         # Sort the data list by size
         lengths = [len(mol["atom_types"]) for mol in data_list]
         argsort = np.argsort(lengths)               # Sort by decreasing size
         self.data_list = [data_list[i] for i in argsort]
         # Store indices where the size changes
         self.split_indices = np.unique(np.sort(lengths), return_index=True)[1][1:]
+        if n_debug_samples is not None:
+            end_index = min(n_debug_samples, len(data_list))
+
 
     def __len__(self):
         return len(self.data_list)
@@ -175,7 +181,7 @@ def collate_fn(batch):
 
 
 class JumpDataLoader(DataLoader):
-    def __init__(self, sequential, dataset, batch_size, shuffle, drop_last=False):
+    def __init__(self, sequential, dataset, batch_size, shuffle, drop_last=False, n_debug_samples=None):
 
         if sequential:
             # This goes over the data sequentially, advantage is that it takes
@@ -192,7 +198,6 @@ class JumpDataLoader(DataLoader):
             # the largest molecule size.
             super().__init__(dataset, batch_size, shuffle=shuffle,
                              collate_fn=collate_fn, drop_last=drop_last)
-
 
 class JumpTransform(object):
     def __init__(self, dataset_info, include_charges, device, sequential):
@@ -213,6 +218,7 @@ class JumpTransform(object):
         one_hot = atom_numbers == self.atomic_decoder
         new_data['one_hot'] = one_hot
         new_data['num_atoms'] = torch.tensor([n], device=self.device).unsqueeze(1)
+        new_data['embeddings'] = torch.tensor(data["embeddings"])
         if self.include_charges:
             new_data['charges'] = torch.zeros(n, 1, device=self.device)
         else:

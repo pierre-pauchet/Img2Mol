@@ -29,7 +29,7 @@ parser.add_argument('--exp_name', type=str, default='')
 
 
 # Latent Diffusion args
-parser.add_argument('--train_diffusion', action='store_true', 
+parser.add_argument('--train_diffusion', action='store_true', default=True,
                     help='Train second stage LatentDiffusionModel model')
 parser.add_argument('--ae_path', type=str, default=None,
                     help='Specify first stage model path')
@@ -37,7 +37,7 @@ parser.add_argument('--trainable_ae', action='store_true',
                     help='Train first stage AutoEncoder model')
 
 # VAE args
-parser.add_argument('--latent_nf', type=int, default=4,
+parser.add_argument('--latent_nf', type=int, default=2,
                     help='number of latent features')
 parser.add_argument('--kl_weight', type=float, default=0.01,
                     help='weight of KL term in ELBO')
@@ -134,7 +134,7 @@ parser.add_argument('--aggregation_method', type=str, default='sum',
 # Mine
 parser.add_argument('--data_augmentation', type=eval, default=False, help='use attention in the EGNN')
 parser.add_argument('--embeddings_data_dir', type=str, default='CondGeoLDM/data/jump_data')
-parser.add_argument("--conditioning", nargs='+', default=['alpha'],
+parser.add_argument("--conditioning", nargs='+', default=[],
                     help='arguments : homo | lumo | alpha | gap | mu | Cv' )
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other') #maybe i should default to a no cond mode
@@ -143,6 +143,7 @@ parser.add_argument('--filter_molecule_size', type=int, default=None)
 parser.add_argument('--sequential', type=bool, default=False)
 
 args = parser.parse_args()
+print(args)
 
 dataset_info = get_dataset_info(args.dataset, args.remove_h)
 
@@ -206,13 +207,15 @@ split_data = build_jump_dataset.load_split_data(args.data_file, val_proportion=0
 transform = build_jump_dataset.JumpTransform(dataset_info, args.include_charges, device, args.sequential)
 dataloaders = {}
 for key, data_list in zip(['train', 'valid', 'test'], split_data):
-    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform)
+    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, n_debug_samples=11241)
     shuffle = (key == 'train') and not args.sequential
 
     # Sequential dataloading disabled for now.
     dataloaders[key] = build_jump_dataset.JumpDataLoader(
         sequential=args.sequential, dataset=dataset, batch_size=args.batch_size,
         shuffle=shuffle)
+
+
 del split_data
 
 atom_encoder = dataset_info['atom_encoder']
@@ -236,8 +239,11 @@ else:
         context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
         embeddings = prepare_embeddings(embeddings, metadata, data_dummy)
         context_node_nf = embeddings.size(2)
-    elif args.conditioning_mode in ['attention', 'other']: # Attention conditioning
-        raise NotImplementedError('Attention conditioning not implemented yet')
+    elif args.conditioning_mode in ['cross_attention', 'other']: # Attention conditioning
+        context_node_nf = 0
+        property_norms = None
+    elif args.conditioning_mode in ['other']: # Attention conditioning
+            raise NotImplementedError('Attention conditioning not implemented yet')
     else: # No conditioning
         context_node_nf = 0
         property_norms = None
@@ -246,7 +252,7 @@ else:
 args.context_node_nf = context_node_nf
 
 
-# Create Latent Diffusion Model or Audoencoderll
+# Create Latent Diffusion Model or Audoencoder
 device = torch.device("cuda" if args.cuda else "cpu")
 
 if args.train_diffusion:
@@ -305,12 +311,12 @@ def main():
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
         train_epoch(args=args, loader=dataloaders['train'], epoch=epoch, model=model, model_dp=model_dp,
-                    model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
+                    model_ema=model_ema_dp, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
                     nodes_dist=nodes_dist, dataset_info=dataset_info,
                     gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist)
         print(f"Epoch took {time.time() - start_epoch:.1f} seconds.")
 
-        if epoch % args.test_epochs == 0:
+        if epoch % args.test_epochs == args.test_epochs - 1:
             if isinstance(model, en_diffusion.EnVariationalDiffusion):
                 wandb.log(model.log_info(), commit=True)
 
