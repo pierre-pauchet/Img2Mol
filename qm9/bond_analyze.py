@@ -35,7 +35,9 @@ bonds1 = {'H': {'H': 74, 'C': 109, 'N': 101, 'O': 96, 'F': 92,
           'Na': {},
           'Hg' : {},
           'Mo' : {},
-          'K' : {},# TODO : Add Na ionic bond length OR remove Na from the dataset
+          'K' : {},
+          'V' : {},
+          # TODO : Add Na ionic bond length OR remove Na from the dataset
           }
 
 bonds2 = {'C': {'C': 134, 'N': 129, 'O': 120, 'S': 160},
@@ -99,7 +101,8 @@ margin1, margin2, margin3 = 10, 5, 3
 allowed_bonds = {'H': 1, 'C': 4, 'N': 3, 'O': 2, 'F': 1, 'B': 3, 'Al': 3,
                  'Si': 4, 'P': [3, 5],
                  'S': 4, 'Cl': 1, 'As': 3, 'Br': 1, 'I': 1, 'Hg': [1, 2],
-                 'Bi': [3, 5], 'Se':1, 'Sn':1, 'Na':1}
+                 'Bi': [3, 5], 'Se':[4,6], 'Sn':[2,4], 'Na':1, 'K':1, 'Mo':3, 'V':[2,3,4,5],
+                 }
 
 
 def get_bond_order(atom1, atom2, distance, check_exists=False):

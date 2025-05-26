@@ -207,7 +207,7 @@ split_data = build_jump_dataset.load_split_data(args.data_file, val_proportion=0
 transform = build_jump_dataset.JumpTransform(dataset_info, args.include_charges, device, args.sequential)
 dataloaders = {}
 for key, data_list in zip(['train', 'valid', 'test'], split_data):
-    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, n_debug_samples=11241)
+    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, n_debug_samples=67050)
     shuffle = (key == 'train') and not args.sequential
 
     # Sequential dataloading disabled for now.
@@ -308,6 +308,7 @@ def main():
 
     best_nll_val = 1e8
     best_nll_test = 1e8
+    test_loaders = dataloaders['test']
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
         train_epoch(args=args, loader=dataloaders['train'], epoch=epoch, model=model, model_dp=model_dp,
@@ -316,14 +317,15 @@ def main():
                     gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist)
         print(f"Epoch took {time.time() - start_epoch:.1f} seconds.")
 
-        if epoch % args.test_epochs == args.test_epochs - 1:
+        if epoch % args.test_epochs == 0:
             if isinstance(model, en_diffusion.EnVariationalDiffusion):
-                wandb.log(model.log_info(), commit=True)
+                wandb.log(model.log_info(), commit=True, step=epoch)
 
             if not args.break_train_epoch and args.train_diffusion:
                 analyze_and_save(args=args, epoch=epoch, model_sample=model_ema, nodes_dist=nodes_dist,
                                  dataset_info=dataset_info, device=device,
-                                 prop_dist=prop_dist, n_samples=args.n_stability_samples)
+                                 prop_dist=prop_dist, n_samples=args.n_stability_samples,
+                                 test_loaders=test_loaders)
             nll_val = test(args=args, loader=dataloaders['valid'], epoch=epoch, eval_model=model_ema_dp,
                            partition='Val', device=device, dtype=dtype, nodes_dist=nodes_dist,
                            property_norms=property_norms)
@@ -352,9 +354,9 @@ def main():
                         pickle.dump(args, f)
             print('Val loss: %.4f \t Test loss:  %.4f' % (nll_val, nll_test))
             print('Best val loss: %.4f \t Best test loss:  %.4f' % (best_nll_val, best_nll_test))
-            wandb.log({"Val loss ": nll_val}, commit=True)
-            wandb.log({"Test loss ": nll_test}, commit=True)
-            wandb.log({"Best cross-validated test loss ": best_nll_test}, commit=True)
+            wandb.log({"Val loss ": nll_val}, commit=True, step=epoch)
+            wandb.log({"Test loss ": nll_test}, commit=True, step=epoch)
+            wandb.log({"Best cross-validated test loss ": best_nll_test}, commit=True, step=epoch)
 
 
 if __name__ == "__main__":

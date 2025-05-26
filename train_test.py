@@ -120,6 +120,8 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
             edge_mask = data['edge_mask'].to(device, dtype)
             one_hot = data['one_hot'].to(device, dtype)
             charges = (data['charges'] if args.include_charges else torch.zeros(0)).to(device, dtype)
+            phenotypes = (data['embeddings'] if args.conditioning_mode == 'cross_attention' else None)
+            
 
             if args.augment_noise > 0:
                 # Add noise eps ~ N(0, augment_noise) around points.
@@ -142,7 +144,7 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
 
             # transform batch through flow
             nll, _, _ = losses.compute_loss_and_nll(args, eval_model, nodes_dist, x, h,
-                                                    node_mask, edge_mask, context)
+                                                    node_mask, edge_mask, context, phenotypes)
             # standard nll from forward KL
 
             nll_epoch += nll.item() * batch_size
@@ -154,10 +156,10 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
     return nll_epoch/n_samples
 
 
-def save_and_sample_chain(model, args, device, dataset_info, prop_dist,
+def save_and_sample_chain(model, args, device, dataset_info, prop_dist, test_loaders,
                           epoch=0, id_from=0, batch_id=''):
     one_hot, charges, x = sample_chain(args=args, device=device, flow=model,
-                                       n_tries=1, dataset_info=dataset_info, prop_dist=prop_dist)
+                                       n_tries=1, dataset_info=dataset_info, prop_dist=prop_dist, test_loaders=test_loaders)
 
     vis.save_xyz_file(f'outputs/{args.exp_name}/epoch_{epoch}_{batch_id}/chain/',
                       one_hot, charges, x, dataset_info, id_from, name='chain')
@@ -165,29 +167,30 @@ def save_and_sample_chain(model, args, device, dataset_info, prop_dist,
     return one_hot, charges, x
 
 
-def sample_different_sizes_and_save(model, nodes_dist, args, device, dataset_info, prop_dist,
+def sample_different_sizes_and_save(model, nodes_dist, args, device, dataset_info, prop_dist, test_loaders,
                                     n_samples=5, epoch=0, batch_size=100, batch_id=''):
     batch_size = min(batch_size, n_samples)
     for counter in range(int(n_samples/batch_size)):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(args, device, model, prop_dist=prop_dist,
                                                 nodesxsample=nodesxsample,
-                                                dataset_info=dataset_info)
+                                                dataset_info=dataset_info, test_loaders=test_loaders)
         print(f"Generated molecule: Positions {x[:-1, :, :]}")
         vis.save_xyz_file(f'outputs/{args.exp_name}/epoch_{epoch}_{batch_id}/', one_hot, charges, x, dataset_info,
                           batch_size * counter, name='molecule')
 
 
-def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info, prop_dist,
+def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info, prop_dist, test_loaders,
                      n_samples=1000, batch_size=100):
     print(f'Analyzing molecule stability at epoch {epoch}...')
     batch_size = min(batch_size, n_samples)
     assert n_samples % batch_size == 0
     molecules = {'one_hot': [], 'x': [], 'node_mask': []}
     for i in tqdm.tqdm(range(int(n_samples/batch_size))):
+        
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(args, device, model_sample, dataset_info, prop_dist,
-                                                nodesxsample=nodesxsample)
+                                                nodesxsample=nodesxsample, test_loaders=test_loaders)
 
         molecules['one_hot'].append(one_hot.detach().cpu())
         molecules['x'].append(x.detach().cpu())

@@ -109,7 +109,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
 
 
 def sample(args, device, generative_model, dataset_info,
-           prop_dist=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
+           prop_dist=None, test_loaders=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
            fix_noise=False):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
 
@@ -135,7 +135,21 @@ def sample(args, device, generative_model, dataset_info,
         context = context.unsqueeze(1).repeat(1, max_n_nodes, 1).to(device) * node_mask
     else:
         context = None
-    phenotypes = None
+    if args.conditioning_mode == 'cross_attention':
+        # samples phenotypes for cross-attention conditioning from the test loaders
+        n_collected = 0
+        phenotypes = []
+        for batch in test_loaders:
+            emb = batch['embeddings'].clone()
+            phenotypes.append(emb)
+            n_collected += 1
+            if n_collected >= batch_size:
+                break
+
+        phenotypes = torch.cat(phenotypes, dim=0).to(device)
+        # 1==1
+    else: 
+        phenotypes = None
     
     if args.probabilistic_model == 'diffusion':
         x, h = generative_model.sample(batch_size, max_n_nodes, node_mask, edge_mask, context, phenotypes, fix_noise=fix_noise)
