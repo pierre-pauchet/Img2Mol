@@ -11,7 +11,7 @@ class EGNN_dynamics_QM9(nn.Module):
                  act_fn=torch.nn.SiLU(), n_layers=4, attention=False,
                  condition_time=True, tanh=False, mode='egnn_dynamics', norm_constant=0,
                  inv_sublayers=2, sin_embedding=False, normalization_factor=100, aggregation_method='sum',
-                 cross_attn=False):
+                 phen_nf=0):
         super().__init__()
         self.mode = mode
         if mode == 'egnn_dynamics':
@@ -21,7 +21,7 @@ class EGNN_dynamics_QM9(nn.Module):
                 n_layers=n_layers, attention=attention, tanh=tanh, norm_constant=norm_constant,
                 inv_sublayers=inv_sublayers, sin_embedding=sin_embedding,
                 normalization_factor=normalization_factor,
-                aggregation_method=aggregation_method, cross_attn=cross_attn)
+                aggregation_method=aggregation_method, phen_nf=phen_nf)
             self.in_node_nf = in_node_nf
         elif mode == 'gnn_dynamics':
             self.gnn = GNN(
@@ -144,7 +144,7 @@ class EGNN_encoder_QM9(nn.Module):
                  act_fn=torch.nn.SiLU(), n_layers=4, attention=False,
                  tanh=False, mode='egnn_dynamics', norm_constant=0,
                  inv_sublayers=2, sin_embedding=False, normalization_factor=100, aggregation_method='sum',
-                 include_charges=True):
+                 include_charges=True, phen_nf=0):
         '''
         :param in_node_nf: Number of invariant features for input nodes.'''
         super().__init__()
@@ -160,7 +160,7 @@ class EGNN_encoder_QM9(nn.Module):
                 n_layers=n_layers, attention=attention, tanh=tanh, norm_constant=norm_constant,
                 inv_sublayers=inv_sublayers, sin_embedding=sin_embedding,
                 normalization_factor=normalization_factor,
-                aggregation_method=aggregation_method)
+                aggregation_method=aggregation_method, phen_nf=phen_nf)
             self.in_node_nf = in_node_nf
         elif mode == 'gnn_dynamics':
             self.gnn = GNN(
@@ -293,7 +293,7 @@ class EGNN_decoder_QM9(nn.Module):
                  act_fn=torch.nn.SiLU(), n_layers=4, attention=False,
                  tanh=False, mode='egnn_dynamics', norm_constant=0,
                  inv_sublayers=2, sin_embedding=False, normalization_factor=100, aggregation_method='sum',
-                 include_charges=True):
+                 include_charges=True, phen_nf=0):
         super().__init__()
 
         include_charges = int(include_charges)
@@ -307,7 +307,7 @@ class EGNN_decoder_QM9(nn.Module):
                 n_layers=n_layers, attention=attention, tanh=tanh, norm_constant=norm_constant,
                 inv_sublayers=inv_sublayers, sin_embedding=sin_embedding,
                 normalization_factor=normalization_factor,
-                aggregation_method=aggregation_method)
+                aggregation_method=aggregation_method, phen_nf=phen_nf)
             self.in_node_nf = in_node_nf
         elif mode == 'gnn_dynamics':
             self.gnn = GNN(
@@ -324,7 +324,7 @@ class EGNN_decoder_QM9(nn.Module):
         self._edges_dict = {}
         # self.condition_time = condition_time
 
-    def forward(self, t, xh, node_mask, edge_mask, context=None):
+    def forward(self, t, xh, node_mask, edge_mask, context, phenotypes):
         raise NotImplementedError
 
     def wrap_forward(self, node_mask, edge_mask, context, phenotypes):

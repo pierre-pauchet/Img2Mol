@@ -4,13 +4,14 @@ import math
 
 class GCL(nn.Module):
     def __init__(self, input_nf, output_nf, hidden_nf, normalization_factor, aggregation_method, 
-                 edges_in_d=0, nodes_att_dim=0, act_fn=nn.SiLU(), attention=False, cross_attn=False):
+                 edges_in_d=0, nodes_att_dim=0, act_fn=nn.SiLU(), attention=False, phen_nf=0):
         super(GCL, self).__init__()
         input_edge = input_nf * 2
         self.normalization_factor = normalization_factor
         self.aggregation_method = aggregation_method
         self.attention = attention
-        self.cross_attn = cross_attn
+        self.phen_nf = phen_nf
+        self.hidden_nf = hidden_nf
 
         self.edge_mlp = nn.Sequential(
             nn.Linear(input_edge + edges_in_d, hidden_nf),
@@ -28,16 +29,17 @@ class GCL(nn.Module):
                 nn.Linear(hidden_nf, 1),
                 nn.Sigmoid())
             
-        if self.cross_attn:
+        if self.phen_nf>0: # cross-attention block
             self.cross_attn_block = nn.MultiheadAttention(
                 embed_dim=hidden_nf,
                 num_heads=2, # Might play around with this later
                 dropout=0.1,
                 batch_first=True,
             )
-            
+            self.phenotype_mlp = nn.Linear(phen_nf, hidden_nf)
+            # self.layer_norm = nn.LayerNorm(hidden_nf)
         
-    def edge_model(self, source, target, edge_attr, edge_mask, phenotypes=None):
+    def edge_model(self, source, target, edge_attr, edge_mask, phenotypes):
         if edge_attr is None:  # Unused.
             out = torch.cat([source, target], dim=1)
         else:
@@ -47,10 +49,23 @@ class GCL(nn.Module):
         if self.attention:
             att_val = self.att_mlp(mij)
             out = mij * att_val
-        elif self.cross_attn:
-            out, attn_weights = self.cross_attn_block(mij, phenotypes, phenotypes) # X_Att between messages and phenotypes
         else:
             out = mij
+        if self.phen_nf>0:
+            bs, _ = phenotypes.shape
+            out_linear = out.view(bs, out.size(0)//bs, self.hidden_nf) # Reshape to bs, n_nodes*2, hidden_nf
+            
+            phenotypes_proj = self.phenotype_mlp(phenotypes)
+            phenotypes_proj = phenotypes_proj.unsqueeze(1) # Reshape to bs, 1, hidden_nf
+            
+            attn_out, attn_weights = self.cross_attn_block(
+                query=out_linear, 
+                key= phenotypes_proj, 
+                value=phenotypes_proj) # X_Att between messages and phenotypes
+            
+            out_linear = out_linear + attn_out
+            # out_linear = self.layer_norm(out_linear + attn_out)
+            out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
 
         if edge_mask is not None:
             out = out * edge_mask
@@ -76,21 +91,8 @@ class GCL(nn.Module):
             h = h * node_mask
         return h, mij
     
-# class CrossAttentionBlock(nn.Module):
-#     def __init__(self, node_mask, edge_mask, embed_dim, n_heads=1, dropout=0.1, 
-#                  batch_first=True, device='cpu'):
-                 
-#         super(CrossAttentionBlock, self).__init__()
-#         self.node_mask = node_mask
-#         self.edge_mask = edge_mask
-#         self.embed_dim = embed_dim
-#         self.n_heads = n_heads
-#         self.dropout = dropout
-
-        
-#     def forward(self, query, key, value, attn_mask=None):
-#         attn_output, attn_output_weights = self.cross_attn(query, key, value)
-#         return attn_output, attn_output_weights
+# class MaskedLayerNorm(nn.Module):
+#     def __init__(self,)
 
 
 class EquivariantUpdate(nn.Module):
@@ -137,7 +139,7 @@ class EquivariantUpdate(nn.Module):
 class EquivariantBlock(nn.Module):
     def __init__(self, hidden_nf, edge_feat_nf=2, device='cpu', act_fn=nn.SiLU(), n_layers=2, attention=True,
                  norm_diff=True, tanh=False, coords_range=15, norm_constant=1, sin_embedding=None,
-                 normalization_factor=100, aggregation_method='sum', cross_attn=False):
+                 normalization_factor=100, aggregation_method='sum', phen_nf=0):
         super(EquivariantBlock, self).__init__()
         self.hidden_nf = hidden_nf
         self.device = device
@@ -148,14 +150,14 @@ class EquivariantBlock(nn.Module):
         self.sin_embedding = sin_embedding
         self.normalization_factor = normalization_factor
         self.aggregation_method = aggregation_method
-        self.cross_attn = cross_attn
+        self.phen_nf = phen_nf
 
         for i in range(0, n_layers):
             self.add_module("gcl_%d" % i, GCL(self.hidden_nf, self.hidden_nf, self.hidden_nf, edges_in_d=edge_feat_nf,
                                               act_fn=act_fn, attention=attention,
                                               normalization_factor=self.normalization_factor,
                                               aggregation_method=self.aggregation_method,
-                                              cross_attn=self.cross_attn))
+                                              phen_nf=self.phen_nf))
         self.add_module("gcl_equiv", EquivariantUpdate(hidden_nf, edges_in_d=edge_feat_nf, act_fn=nn.SiLU(), tanh=tanh,
                                                        coords_range=self.coords_range_layer,
                                                        normalization_factor=self.normalization_factor,
@@ -181,7 +183,7 @@ class EquivariantBlock(nn.Module):
 class EGNN(nn.Module):
     def __init__(self, in_node_nf, in_edge_nf, hidden_nf, device='cpu', act_fn=nn.SiLU(), n_layers=3, attention=False,
                  norm_diff=True, out_node_nf=None, tanh=False, coords_range=15, norm_constant=1, inv_sublayers=2,
-                 sin_embedding=False, normalization_factor=100, aggregation_method='sum', cross_attn=False):
+                 sin_embedding=False, normalization_factor=100, aggregation_method='sum', phen_nf=0):
         super(EGNN, self).__init__()
         if out_node_nf is None:
             out_node_nf = in_node_nf
@@ -192,7 +194,7 @@ class EGNN(nn.Module):
         self.norm_diff = norm_diff
         self.normalization_factor = normalization_factor
         self.aggregation_method = aggregation_method
-        self.cross_attn = cross_attn
+        self.phen_nf = phen_nf
         
         if sin_embedding:
             self.sin_embedding = SinusoidsEmbeddingNew()
@@ -211,7 +213,7 @@ class EGNN(nn.Module):
                                                                sin_embedding=self.sin_embedding,
                                                                normalization_factor=self.normalization_factor,
                                                                aggregation_method=self.aggregation_method,
-                                                               cross_attn=self.cross_attn))
+                                                               phen_nf=self.phen_nf,))
         self.to(self.device)
 
     def forward(self, h, x, edge_index, node_mask=None, edge_mask=None, phenotypes=None):

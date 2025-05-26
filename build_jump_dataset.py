@@ -113,8 +113,6 @@ class JumpDataset(Dataset):
         self.data_list = [data_list[i] for i in argsort]
         # Store indices where the size changes
         self.split_indices = np.unique(np.sort(lengths), return_index=True)[1][1:]
-        if n_debug_samples is not None:
-            end_index = min(n_debug_samples, len(data_list))
 
 
     def __len__(self):

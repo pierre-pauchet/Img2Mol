@@ -55,6 +55,7 @@ def get_autoencoder(args, device, dataset_info, dataloader_train):
     histogram = dataset_info['n_nodes']
     in_node_nf = len(dataset_info['atom_decoder']) + int(args.include_charges)
     nodes_dist = DistributionNodes(histogram)
+    phen_nf = dataset_info['phenotype_embedding_nf'] if args.conditioning_mode == 'cross_attention' else 0
 
     prop_dist = None
     if len(args.conditioning) > 0:
@@ -73,7 +74,7 @@ def get_autoencoder(args, device, dataset_info, dataloader_train):
         attention=args.attention, tanh=args.tanh, mode=args.model, norm_constant=args.norm_constant,
         inv_sublayers=args.inv_sublayers, sin_embedding=args.sin_embedding,
         normalization_factor=args.normalization_factor, aggregation_method=args.aggregation_method,
-        include_charges=args.include_charges
+        include_charges=args.include_charges, phen_nf=phen_nf
         )
     
     decoder = EGNN_decoder_QM9(
@@ -83,7 +84,7 @@ def get_autoencoder(args, device, dataset_info, dataloader_train):
         attention=args.attention, tanh=args.tanh, mode=args.model, norm_constant=args.norm_constant,
         inv_sublayers=args.inv_sublayers, sin_embedding=args.sin_embedding,
         normalization_factor=args.normalization_factor, aggregation_method=args.aggregation_method,
-        include_charges=args.include_charges
+        include_charges=args.include_charges, phen_nf=phen_nf
         )
 
     vae = EnHierarchicalVAE(
@@ -94,7 +95,8 @@ def get_autoencoder(args, device, dataset_info, dataloader_train):
         latent_node_nf=args.latent_nf,
         kl_weight=args.kl_weight,
         norm_values=args.normalize_factors,
-        include_charges=args.include_charges
+        include_charges=args.include_charges,
+        phen_nf=phen_nf
         )
 
     return vae, nodes_dist, prop_dist
@@ -137,13 +139,16 @@ def get_latent_diffusion(args, device, dataset_info, dataloader_train):
         print('Warning: dynamics model is _not_ conditioned on time.')
         dynamics_in_node_nf = in_node_nf
 
+    phen_nf = dataset_info['phenotype_embedding_nf'] if args.conditioning_mode == 'cross_attention' else 0
+    
     net_dynamics = EGNN_dynamics_QM9(
         in_node_nf=dynamics_in_node_nf, context_node_nf=args.context_node_nf,
         n_dims=3, device=device, hidden_nf=args.nf,
         act_fn=torch.nn.SiLU(), n_layers=args.n_layers,
         attention=args.attention, tanh=args.tanh, mode=args.model, norm_constant=args.norm_constant,
         inv_sublayers=args.inv_sublayers, sin_embedding=args.sin_embedding,
-        normalization_factor=args.normalization_factor, aggregation_method=args.aggregation_method)
+        normalization_factor=args.normalization_factor, aggregation_method=args.aggregation_method,
+        phen_nf=phen_nf)
 
     if args.probabilistic_model == 'diffusion':
         vdm = EnLatentDiffusion(
@@ -157,7 +162,8 @@ def get_latent_diffusion(args, device, dataset_info, dataloader_train):
             noise_precision=args.diffusion_noise_precision,
             loss_type=args.diffusion_loss_type,
             norm_values=args.normalize_factors,
-            include_charges=args.include_charges
+            include_charges=args.include_charges,
+            phen_nf=phen_nf
             )
 
         return vdm, nodes_dist, prop_dist

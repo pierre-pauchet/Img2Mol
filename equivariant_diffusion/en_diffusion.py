@@ -256,7 +256,7 @@ class EnVariationalDiffusion(torch.nn.Module):
             dynamics: models.EGNN_dynamics_QM9, in_node_nf: int, n_dims: int,
             timesteps: int = 1000, parametrization='eps', noise_schedule='learned',
             noise_precision=1e-4, loss_type='vlb', norm_values=(1., 1., 1.),
-            norm_biases=(None, 0., 0.), include_charges=True):
+            norm_biases=(None, 0., 0.), include_charges=True, phen_nf=0):
         super().__init__()
 
         assert loss_type in {'vlb', 'l2'}
@@ -862,7 +862,8 @@ class EnHierarchicalVAE(torch.nn.Module):
             in_node_nf: int, n_dims: int, latent_node_nf: int,
             kl_weight: float,
             norm_values=(1., 1., 1.), norm_biases=(None, 0., 0.), 
-            include_charges=True):
+            include_charges=True,
+            phen_nf=0):
         super().__init__()
 
         self.include_charges = include_charges
@@ -876,6 +877,7 @@ class EnHierarchicalVAE(torch.nn.Module):
         self.num_classes = self.in_node_nf - self.include_charges
         self.kl_weight = kl_weight
 
+        self.phen_nf=phen_nf
         self.norm_values = norm_values
         self.norm_biases = norm_biases
         self.register_buffer('buffer', torch.zeros(1))
