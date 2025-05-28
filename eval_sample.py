@@ -6,7 +6,7 @@ except ModuleNotFoundError:
 
 import utils
 import argparse
-from configs.datasets_config import qm9_with_h, qm9_without_h
+from configs.datasets_config import qm9_with_h, qm9_without_h, jump
 from qm9 import dataset
 from qm9.models import get_model, get_autoencoder, get_latent_diffusion
 

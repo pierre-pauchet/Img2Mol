@@ -36,13 +36,37 @@ def retrieve_dataloaders(cfg):
                                          collate_fn=preprocess.collate_fn)
                              for split, dataset in datasets.items()}
     elif 'jump' in cfg.dataset:
+        import build_jump_dataset       
+        from configs.datasets_config import get_dataset_info
+        data_file = '/projects/iktos/pierre/CondGeoLDM/charac.npy'
         batch_size = cfg.batch_size
         batch_size = cfg.batch_size
         num_workers = cfg.num_workers
         filter_n_atoms = cfg.filter_n_atoms
+        dataset_info = get_dataset_info(cfg.dataset, cfg.remove_h)
+
         # Initialize dataloader
-        args = init_argparse('jump')
         print('Loading JUMP dataset')
+        split_data = build_jump_dataset.load_split_data(data_file, 
+                                                        val_proportion=0.1, 
+                                                        test_proportion=0.1, 
+                                                        filter_size=cfg.filter_molecule_size)
+        transform = build_jump_dataset.JumpTransform(dataset_info, 
+                                                        cfg.include_charges,
+                                                          cfg.device,
+                                                          cfg.sequential)
+        dataloaders = {}
+        for key, data_list in zip(['train', 'valid', 'test'], split_data):
+            dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, n_debug_samples=None)
+            shuffle = (key == 'train') and not cfg.sequential
+
+            # Sequential dataloading disabled for now.
+            dataloaders[key] = build_jump_dataset.JumpDataLoader(
+            sequential=cfg.sequential, dataset=dataset, batch_size=cfg.batch_size,
+            shuffle=shuffle)
+        del split_data
+        charge_scale = None
+        
     elif 'geom' in cfg.dataset:
         import build_geom_dataset
         from configs.datasets_config import get_dataset_info

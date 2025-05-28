@@ -2,6 +2,9 @@
 # idee : checker tous les assignements de device et les remplacer par un device unique, défini en dessous des argsparser
 
 # Rdkit import should be first, do not move it
+import os
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # Set CUDA_VISIBLE_DEVICES to use GPU 0
+
 try:
     from rdkit import Chem
 except ModuleNotFoundError:
@@ -141,6 +144,8 @@ parser.add_argument('--conditioning_mode', type=str, default='original',
 parser.add_argument('--data_file', type=str, default='/projects/iktos/pierre/CondGeoLDM/charac.npy')
 parser.add_argument('--filter_molecule_size', type=int, default=None)
 parser.add_argument('--sequential', type=bool, default=False)
+parser.add_argument('--percent_train_ds', type=int, default=None,
+                    help='number of molecules used in train.')
 
 args = parser.parse_args()
 print(args)
@@ -155,6 +160,7 @@ args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
+
 dtype = torch.float32
 
 if args.resume is not None:
@@ -196,7 +202,7 @@ if args.no_wandb:
     mode = 'disabled'
 else:
     mode = 'online' if args.online else 'offline'
-kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion_qm9', 'config': args,
+kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion', 'config': vars(args),
           'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': mode}
 wandb.init(**kwargs)
 wandb.save('*.txt')
@@ -207,7 +213,7 @@ split_data = build_jump_dataset.load_split_data(args.data_file, val_proportion=0
 transform = build_jump_dataset.JumpTransform(dataset_info, args.include_charges, device, args.sequential)
 dataloaders = {}
 for key, data_list in zip(['train', 'valid', 'test'], split_data):
-    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, n_debug_samples=67050)
+    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, percent_train_ds=args.percent_train_ds)
     shuffle = (key == 'train') and not args.sequential
 
     # Sequential dataloading disabled for now.
@@ -286,6 +292,7 @@ def main():
 
     # Initialize dataparallel if enabled and possible.
     if args.dp and torch.cuda.device_count() > 1:
+        print(args.dp)
         print(f'Training using {torch.cuda.device_count()} GPUs')
         model_dp = torch.nn.DataParallel(model.cpu())
         model_dp = model_dp.cuda()

@@ -1,5 +1,4 @@
-import msgpack
-import os
+
 import numpy as np
 import torch
 from torch.utils.data import BatchSampler, DataLoader, Dataset, SequentialSampler, Subset
@@ -97,15 +96,16 @@ def load_split_data(data_file='charac.npy', val_proportion=0.1, test_proportion=
 
 
 class JumpDataset(Dataset):
-    def __init__(self, data_list, transform=None, n_debug_samples=None):
+    def __init__(self, data_list, transform=None, percent_train_ds=None):
         """
         Args:
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
         self.transform = transform
-        if n_debug_samples is not None:
-            end_index = min(n_debug_samples, len(data_list))
+        if percent_train_ds is not None:
+            assert 0 < percent_train_ds <= 100, "percent_train_ds must be between 0 and 100"
+            end_index = len(data_list)*percent_train_ds //100
             data_list = data_list[:end_index]
         # Sort the data list by size
         lengths = [len(mol["atom_types"]) for mol in data_list]

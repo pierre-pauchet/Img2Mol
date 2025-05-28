@@ -16,8 +16,10 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
                 nodes_dist, gradnorm_queue, dataset_info, prop_dist):
     model_dp.train()
     model.train()
+    model.to(device)
     nll_epoch = []
     n_iterations = len(loader)
+    print('device:', device)
     for i, data in enumerate(loader):
 
         x = data['positions'].to(device, dtype)
@@ -25,7 +27,7 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
         edge_mask = data['edge_mask'].to(device, dtype)
         one_hot = data['one_hot'].to(device, dtype)
         charges = (data['charges'].to(device, dtype) if args.include_charges else torch.zeros(0))
-        phenotypes = (data['embeddings'] if args.conditioning_mode == 'cross_attention' else None)
+        phenotypes = (data['embeddings'].to(device) if args.conditioning_mode == 'cross_attention' else None)
         x = remove_mean_with_mask(x, node_mask)
         if i==0 and args.conditioning_mode == 'cross_attention':
             print(phenotypes[0])
@@ -87,6 +89,8 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
             sample_different_sizes_and_save(model_ema, nodes_dist, args, device, dataset_info,
                                             prop_dist, epoch=epoch)
             print(f'Sampling took {time.time() - start:.2f} seconds')
+            examples = data
+            wandb.log({"train_sample": wandb.Table(data=[[str(examples)]], columns=["Sample"])})
 
             vis.visualize(f"outputs/{args.exp_name}/epoch_{epoch}_{i}", dataset_info=dataset_info, wandb=wandb)
             vis.visualize_chain(f"outputs/{args.exp_name}/epoch_{epoch}_{i}/chain/", dataset_info, wandb=wandb)

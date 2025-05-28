@@ -1,10 +1,12 @@
 # Rdkit import should be first, do not move it
+import os
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'  # Set CUDA_VISIBLE_DEVICES to use GPU 1
 try:
     from rdkit import Chem
 except ModuleNotFoundError:
     pass
 import build_geom_dataset
-from configs.datasets_config import geom_with_h
+from configs.datasets_config import geom_with_h, geom_no_h
 import copy
 import utils
 import argparse
@@ -130,14 +132,16 @@ parser.add_argument('--sequential', action='store_true',
                     help='Organize data by size to reduce average memory usage.')
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other')
+parser.add_argument('--percent_train_ds', type=int, default=None,
+                    help='number of molecules used in train.')
 args = parser.parse_args()
 
-data_file = '/projects/iktos/pierre/CondGeoLDM/data/geom/geom_drugs_30.npy'
+data_file = '/projects/iktos/pierre/CondGeoLDM/data/geom/geom_drugs_no_h_30.npy'
 
 if args.remove_h:
     raise NotImplementedError()
 else:
-    dataset_info = geom_with_h
+    dataset_info = geom_no_h
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
@@ -147,12 +151,12 @@ split_data = build_geom_dataset.load_split_data(data_file, val_proportion=0.1, t
 transform = build_geom_dataset.GeomDrugsTransform(dataset_info, args.include_charges, device, args.sequential)
 dataloaders = {}
 for key, data_list in zip(['train', 'valid', 'test'], split_data):
-    dataset = build_geom_dataset.GeomDrugsDataset(data_list, transform=transform)
+    dataset = build_geom_dataset.GeomDrugsDataset(data_list, transform=transform,percent_train_ds=args.percent_train_ds)
     shuffle = (key == 'train') and not args.sequential
 
     # Sequential dataloading disabled for now.
     dataloaders[key] = build_geom_dataset.GeomDrugsDataLoader(
-        sequential=args.sequential, dataset=dataset, batch_size=args.batch_size,
+        sequential=args.sequential, dataset=dataset, batch_size=args.batch_size, 
         shuffle=shuffle)
 del split_data
 
@@ -185,7 +189,7 @@ if args.no_wandb:
     mode = 'disabled'
 else:
     mode = 'online' if args.online else 'offline'
-kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion_geom', 'config': args,
+kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion', 'config': vars(args),
           'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': mode}
 wandb.init(**kwargs)
 wandb.save('*.txt')

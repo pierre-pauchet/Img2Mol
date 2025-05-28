@@ -157,7 +157,7 @@ def plot_data3d(positions, atom_type, dataset_info, camera_elev=0, camera_azim=0
                 bg='black', alpha=1.):
     black = (0, 0, 0)
     white = (1, 1, 1)
-    hex_bg_color = '#FFFFFF' if bg == 'black' else '#666666'
+    hex_bg_color = '#FFFFFF' if bg == 'black' else "#000000"
 
     from mpl_toolkits.mplot3d import Axes3D
     fig = plt.figure()

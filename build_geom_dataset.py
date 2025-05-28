@@ -111,14 +111,17 @@ def load_split_data(conformation_file, val_proportion=0.1, test_proportion=0.1,
 
 
 class GeomDrugsDataset(Dataset):
-    def __init__(self, data_list, transform=None):
+    def __init__(self, data_list, transform=None, percent_train_ds=None):
         """
         Args:
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
         self.transform = transform
-
+        if percent_train_ds is not None:
+            assert 0 < percent_train_ds <= 100, "percent_train_ds must be between 0 and 100"
+            end_index = len(data_list)*percent_train_ds //100
+            data_list = data_list[:end_index]
         # Sort the data list by size
         lengths = [s.shape[0] for s in data_list]
         argsort = np.argsort(lengths)               # Sort by decreasing size
