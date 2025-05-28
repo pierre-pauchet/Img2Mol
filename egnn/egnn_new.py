@@ -64,7 +64,7 @@ class GCL(nn.Module):
                 value=phenotypes_proj) # X_Att between messages and phenotypes
             
             out_linear = out_linear + attn_out
-            # out_linear = self.layer_norm(out_linear + attn_out)
+            # out_linear = self.layer_norm(out_linear)
             out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
 
         if edge_mask is not None:
