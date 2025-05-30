@@ -839,7 +839,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         """
         gamma_0 = self.gamma(torch.zeros(1, device=self.buffer.device))
         gamma_1 = self.gamma(torch.ones(1, device=self.buffer.device))
-
+        
         log_SNR_max = -gamma_0
         log_SNR_min = -gamma_1
 

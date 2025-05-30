@@ -164,7 +164,7 @@ def get_dataset_info(dataset_name, remove_h):
         if not remove_h:
             return geom_with_h
         else:
-            raise Exception('Missing config for %s without hydrogens' % dataset_name)
+            return geom_no_h # suposedly missing ? 
     elif dataset_name == 'qm9_second_half':
         if not remove_h:
             return qm9_second_half

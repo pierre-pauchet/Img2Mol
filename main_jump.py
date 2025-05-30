@@ -319,14 +319,14 @@ def main():
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
         train_epoch(args=args, loader=dataloaders['train'], epoch=epoch, model=model, model_dp=model_dp,
-                    model_ema=model_ema_dp, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
+                    model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
                     nodes_dist=nodes_dist, dataset_info=dataset_info,
-                    gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist)
+                    gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders)
         print(f"Epoch took {time.time() - start_epoch:.1f} seconds.")
-
+        if isinstance(model, en_diffusion.EnVariationalDiffusion):
+            wandb.log(model.log_info(), commit=True, step=epoch)
         if epoch % args.test_epochs == 0:
-            if isinstance(model, en_diffusion.EnVariationalDiffusion):
-                wandb.log(model.log_info(), commit=True, step=epoch)
+
 
             if not args.break_train_epoch and args.train_diffusion:
                 analyze_and_save(args=args, epoch=epoch, model_sample=model_ema, nodes_dist=nodes_dist,
@@ -361,9 +361,9 @@ def main():
                         pickle.dump(args, f)
             print('Val loss: %.4f \t Test loss:  %.4f' % (nll_val, nll_test))
             print('Best val loss: %.4f \t Best test loss:  %.4f' % (best_nll_val, best_nll_test))
-            wandb.log({"Val loss ": nll_val}, commit=True, step=epoch)
-            wandb.log({"Test loss ": nll_test}, commit=True, step=epoch)
-            wandb.log({"Best cross-validated test loss ": best_nll_test}, commit=True, step=epoch)
+            wandb.log({"Val loss ": nll_val, "Epoch":epoch}, commit=True)
+            wandb.log({"Test loss ": nll_test, "Epoch":epoch}, commit=True)
+            wandb.log({"Best cross-validated test loss ": best_nll_test, "Epoch":epoch}, commit=True)
 
 
 if __name__ == "__main__":

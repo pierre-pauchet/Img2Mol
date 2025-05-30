@@ -150,8 +150,8 @@ dtype = torch.float32
 split_data = build_geom_dataset.load_split_data(data_file, val_proportion=0.1, test_proportion=0.1, filter_size=args.filter_molecule_size)
 transform = build_geom_dataset.GeomDrugsTransform(dataset_info, args.include_charges, device, args.sequential)
 dataloaders = {}
-for key, data_list in zip(['train', 'valid', 'test'], split_data):
-    dataset = build_geom_dataset.GeomDrugsDataset(data_list, transform=transform,percent_train_ds=args.percent_train_ds)
+for key, data_list in zip(['train', 'val', 'test'], split_data):
+    dataset = build_geom_dataset.GeomDrugsDataset(data_list, transform=transform, percent_train_ds=args.percent_train_ds)
     shuffle = (key == 'train') and not args.sequential
 
     # Sequential dataloading disabled for now.
@@ -222,6 +222,7 @@ optim = get_optim(args, model)
 
 gradnorm_queue = utils.Queue()
 gradnorm_queue.add(3000)  # Add large value that will be flushed.
+test_loaders = dataloaders['test']
 
 
 def main():
@@ -260,16 +261,17 @@ def main():
         start_epoch = time.time()
         train_test.train_epoch(args, dataloaders['train'], epoch, model, model_dp, model_ema, ema, device, dtype,
                                property_norms, optim, nodes_dist, gradnorm_queue, dataset_info,
-                               prop_dist)
+                               prop_dist, test_loaders)
         print(f"Epoch took {time.time() - start_epoch:.1f} seconds.")
-
+        
+        if isinstance(model, en_diffusion.EnVariationalDiffusion):
+            wandb.log(model.log_info(), commit=True)
+            
         if epoch % args.test_epochs == 0:
-            if isinstance(model, en_diffusion.EnVariationalDiffusion):
-                wandb.log(model.log_info(), commit=True)
-
             if not args.break_train_epoch:
                 train_test.analyze_and_save(epoch, model_ema, nodes_dist, args, device,
-                                            dataset_info, prop_dist, n_samples=args.n_stability_samples)
+                                            dataset_info, prop_dist, n_samples=args.n_stability_samples,
+                                            test_loaders=test_loaders)
             nll_val = train_test.test(args, dataloaders['val'], epoch, model_ema_dp, device, dtype,
                                       property_norms, nodes_dist, partition='Val')
             nll_test = train_test.test(args, dataloaders['test'], epoch, model_ema_dp, device, dtype,
@@ -296,9 +298,10 @@ def main():
                     pickle.dump(args, f)
             print('Val loss: %.4f \t Test loss:  %.4f' % (nll_val, nll_test))
             print('Best val loss: %.4f \t Best test loss:  %.4f' % (best_nll_val, best_nll_test))
-            wandb.log({"Val loss ": nll_val}, commit=True)
-            wandb.log({"Test loss ": nll_test}, commit=True)
-            wandb.log({"Best cross-validated test loss ": best_nll_test}, commit=True)
+            wandb.log({"Val loss ": nll_val, "Epoch":epoch}, commit=True)
+            wandb.log({"Test loss ": nll_test, "Epoch":epoch}, commit=True)
+            wandb.log({"Best cross-validated test loss ": best_nll_test, "Epoch":epoch}, commit=True)
+
 
 
 if __name__ == "__main__":

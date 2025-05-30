@@ -51,7 +51,7 @@ def reverse_tensor(x):
     return x[torch.arange(x.size(0) - 1, -1, -1)]
 
 
-def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
+def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test_loaders=None):
     n_samples = 1
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
@@ -68,9 +68,23 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
         #context = torch.zeros(n_samples, n_nodes, args.context_node_nf).to(device)
     else:
         context = None
-    phenotypes = None
-    node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
+    if args.conditioning_mode == 'cross_attention':
+        # samples phenotypes for cross-attention conditioning from the test loaders
+        n_collected = 0
+        phenotypes = []
+        for batch in test_loaders:
+            emb = batch['embeddings'].clone()
+            phenotypes.append(emb)
+            n_collected += 1
+            if n_collected >= n_nodes:
+                break
 
+        phenotypes = torch.cat(phenotypes, dim=0).to(device)
+        # 1==1
+    else: 
+        phenotypes = None
+        
+    node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
     edge_mask = (1 - torch.eye(n_nodes)).unsqueeze(0)
     edge_mask = edge_mask.repeat(n_samples, 1, 1).view(-1, 1).to(device)
     keep_frames = min(100, args.n_stability_samples)
