@@ -40,3 +40,4 @@ data/jump_data/Embeddings_norm.npy
 python3.9/*
 position_stats_Jump Dataset.png
 position_stats_Geom Dataset.png
+*.npy
