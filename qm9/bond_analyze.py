@@ -1,6 +1,5 @@
 # Bond lengths from:
-# http://www.wiredchemist.com/chemisImplémenter la possiblité de faire tourner sur un subset : modifier le paramètre n_debug_samples, hard codé dans le main try/data/bond_energies_lengths.html
-# And:
+# http://www.wiredchemist.com/chemis:
 # http://chemistry-reference.com/tables/Bond%20Lengths%20and%20Enthalpies.pdf
 bonds1 = {'H': {'H': 74, 'C': 109, 'N': 101, 'O': 96, 'F': 92,
                 'B': 119, 'Si': 148, 'P': 144, 'As': 152, 'S': 134,

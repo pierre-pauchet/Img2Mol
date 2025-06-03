@@ -51,7 +51,7 @@ def reverse_tensor(x):
     return x[torch.arange(x.size(0) - 1, -1, -1)]
 
 
-def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test_loaders=None):
+def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test_loaders=None, random_idx=False):
     n_samples = 1
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
@@ -71,16 +71,20 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
     if args.conditioning_mode == 'cross_attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
         n_collected = 0
-        phenotypes = []
+        all_phenotypes = []
         for batch in test_loaders:
             emb = batch['embeddings'].clone()
-            phenotypes.append(emb)
+            all_phenotypes.append(emb)
             n_collected += 1
             if n_collected >= n_nodes:
                 break
 
-        phenotypes = torch.cat(phenotypes, dim=0).to(device)
-        # 1==1
+        all_phenotypes = torch.cat(all_phenotypes, dim=0).to(device)
+        if random_idx:
+                random_embedding_idx = torch.randint(0, all_phenotypes.size(0), (n_samples,))
+                phenotypes = all_phenotypes[random_embedding_idx]
+        else:
+            phenotypes = all_phenotypes[:n_samples]
     else: 
         phenotypes = None
         

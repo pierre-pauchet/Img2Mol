@@ -24,7 +24,7 @@ from equivariant_diffusion import utils as flow_utils
 import torch
 import time
 import pickle
-from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings, load_embeddings
+from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings
 from train_test import train_epoch, test, analyze_and_save
 
 parser = argparse.ArgumentParser(description='E3Diffusion')
@@ -146,6 +146,8 @@ parser.add_argument('--filter_molecule_size', type=int, default=None)
 parser.add_argument('--sequential', type=bool, default=False)
 parser.add_argument('--percent_train_ds', type=int, default=None,
                     help='number of molecules used in train.')
+parser.add_argument('--viability_metrics_epochs', type=int, default=None,
+                    help='Frequence of computation of metrics. Defaults to test_epochs')
 
 args = parser.parse_args()
 print(args)
@@ -157,9 +159,10 @@ atom_decoder = dataset_info['atom_decoder']
 
 # args, unparsed_args = parser.parse_known_args()
 args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
-
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
+if args.viability_metrics_epochs is None:
+    args.viability_metrics_epochs = args.test_epochs
 
 dtype = torch.float32
 
@@ -193,8 +196,6 @@ utils.create_folders(args)
 # print(args)
 
 # Embeddings for conditioning
-if args.conditioning_mode in ['naive', 'attention']:
-    embeddings, metadata = load_embeddings(args.embeddings_data_dir)
     
     
 # Wandb config
@@ -241,9 +242,7 @@ else:
         context_node_nf = context_dummy.size(2)
     elif args.conditioning_mode == 'naive': # Naive conditioning
         print(f'Conditioning on {args.conditioning_mode}')
-        property_norms = compute_mean_mad(dataloaders, args.conditioning, args.dataset)
-        context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
-        embeddings = prepare_embeddings(embeddings, metadata, data_dummy)
+        embeddings = prepare_embeddings(data_dummy, verbose=True)
         context_node_nf = embeddings.size(2)
     elif args.conditioning_mode in ['cross_attention', 'other']: # Attention conditioning
         context_node_nf = 0
@@ -274,6 +273,7 @@ optim = get_optim(args, model)
 
 gradnorm_queue = utils.Queue()
 gradnorm_queue.add(3000)  # Add large value that will be flushed.
+
 
 
 def check_mask_correct(variables, node_mask):
@@ -324,11 +324,9 @@ def main():
                     gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders)
         print(f"Epoch took {time.time() - start_epoch:.1f} seconds.")
         if isinstance(model, en_diffusion.EnVariationalDiffusion):
-            wandb.log(model.log_info(), commit=True, step=epoch)
+            wandb.log(model.log_info(), commit=True)
         if epoch % args.test_epochs == 0:
-
-
-            if not args.break_train_epoch and args.train_diffusion:
+            if not args.break_train_epoch and args.train_diffusion and epoch % args.viability_metrics_epochs == 0:
                 analyze_and_save(args=args, epoch=epoch, model_sample=model_ema, nodes_dist=nodes_dist,
                                  dataset_info=dataset_info, device=device,
                                  prop_dist=prop_dist, n_samples=args.n_stability_samples,

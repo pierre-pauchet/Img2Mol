@@ -95,37 +95,16 @@ def prepare_context(conditioning, minibatch, property_norms, verbose=False):
     return context
 
 
-def load_embeddings(embeddings_data_dir, merge_data=False):
-    """
-    Creates the array for embeddings
-    returns :
-    - embeddings : torch.Tensor (n_embeddings, n_features_embeddings)
-    - metadata : df.Dataframe (n_embeddings, 3)
-        columns : ['Metadata_JCP2022', 'Metadata_InChI', 'Metadata_Is_dmso']
-    """
-    print("Loading metadata from", embeddings_data_dir)
-    metadata = pd.read_parquet(embeddings_data_dir+'/'+"metadata.parquet")
-    metadata.set_index(metadata.Metadata_InChI_ID, inplace=True, drop=True)
-    print("Loading embeddings from", embeddings_data_dir)
-    
-    embeddings = np.load(embeddings_data_dir+'/'+"Embeddings_norm.npy")
-    if (merge_data):  # make a unique DF with embeddings and corresponding molecule metadata
-        embeddings = pd.DataFrame(embeddings)
-        for i in range(embeddings.shape[1]):
-            if i == 0 or i == 100 or i == 1535:
-                print(i)
-            metadata[f"Embeddings_{i}"] = embeddings.iloc[:, 1]
-    print("Done loading embeddings")
-    return torch.from_numpy(embeddings), metadata
 
 
-def prepare_embeddings(embeddings, metadata, minibatch, verbose=False):
+
+def prepare_embeddings(minibatch, verbose=False):
     """ """
     batch_size, n_nodes, _ = minibatch["positions"].size()
+    
     node_mask = minibatch["atom_mask"].unsqueeze(2)
-    batch_embeddings = embeddings[:batch_size]
-    context = batch_embeddings.unsqueeze(1)
-    context = context.expand(batch_size, n_nodes, embeddings.shape[1])
+    context = minibatch["embeddings"]
+    
     if verbose:
         print(f"Emeddings cont shape: {context.shape}")
         print(f"Embeddings as context: {context}")

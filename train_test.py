@@ -210,7 +210,7 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
 
     wandb.log(validity_dict)
     if rdkit_tuple is not None:
-        wandb.log({'Validity': rdkit_tuple[0][0], 'Uniqueness': rdkit_tuple[0][1], 'Novelty': rdkit_tuple[0][2]}, step=epoch)
+        wandb.log({'Validity': rdkit_tuple[0][0], 'Uniqueness': rdkit_tuple[0][1], 'Novelty': rdkit_tuple[0][2]})
     return validity_dict
 
 
