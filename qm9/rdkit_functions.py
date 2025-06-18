@@ -106,20 +106,21 @@ class BasicMolecularMetrics(object):
             self.dataset_smiles_list = retrieve_qm9_smiles(
                 self.dataset_info)
 
-    def compute_validity(self, generated):
+    def compute_validity_and_connectivity(self, generated):
         """ generated: list of couples (positions, atom_types)"""
         valid = []
-
+        connected = []
         for graph in generated:
             mol = build_molecule(*graph, self.dataset_info)
             smiles = mol2smiles(mol)
             if smiles is not None:
                 mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True)
+                if len(mol_frags) == 0:
+                    connected.append(True)
                 largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
                 smiles = mol2smiles(largest_mol)
                 valid.append(smiles)
-
-        return valid, len(valid) / len(generated)
+        return valid, len(valid) / len(generated), len(connected) / len(generated)
 
     def compute_uniqueness(self, valid):
         """ valid: list of SMILES strings."""
@@ -137,7 +138,7 @@ class BasicMolecularMetrics(object):
     def evaluate(self, generated):
         """ generated: list of pairs (positions: n x 3, atom_types: n [int])
             the positions and atom types should already be masked. """
-        valid, validity = self.compute_validity(generated)
+        valid, validity, connectivity = self.compute_validity_and_connectivity(generated)
         print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
         if validity > 0:
             unique, uniqueness = self.compute_uniqueness(valid)
@@ -152,13 +153,18 @@ class BasicMolecularMetrics(object):
             novelty = 0.0
             uniqueness = 0.0
             unique = None
-        return [validity, uniqueness, novelty], unique
+            connectivity = 0.0
+        return [validity, uniqueness, novelty, connectivity], unique
 
 
 def mol2smiles(mol):
     try:
         Chem.SanitizeMol(mol)
     except ValueError:
+        return None
+    except Chem.rdchem.KekulizeException:
+        return None
+    except Chem.rdchem.AtomValenceException:
         return None
     return Chem.MolToSmiles(mol)
 

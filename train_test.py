@@ -19,7 +19,6 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
     model.to(device)
     nll_epoch = []
     n_iterations = len(loader)
-    print('device:', device)
     for i, data in enumerate(loader):
 
         x = data['positions'].to(device, dtype)
@@ -168,9 +167,10 @@ def save_and_sample_chain(model, args, device, dataset_info, prop_dist, test_loa
         model = model.module
     one_hot, charges, x = sample_chain(args=args, device=device, flow=model,
                                        n_tries=1, dataset_info=dataset_info, prop_dist=prop_dist, test_loaders=test_loaders)
-
-    vis.save_xyz_file(f'outputs/{args.exp_name}/epoch_{epoch}_{batch_id}/chain/',
-                      one_hot, charges, x, dataset_info, id_from, name='chain')
+    
+    for sample_id in range(one_hot.size(0)):
+        vis.save_xyz_file(f'outputs/{args.exp_name}/epoch_{epoch}_{batch_id}/chain/',
+                      one_hot[sample_id], charges[sample_id], x[sample_id], dataset_info, sample_id, name='chain')
 
     return one_hot, charges, x
 
@@ -183,15 +183,14 @@ def sample_different_sizes_and_save(model, nodes_dist, args, device, dataset_inf
         one_hot, charges, x, node_mask = sample(args, device, model, prop_dist=prop_dist,
                                                 nodesxsample=nodesxsample,
                                                 dataset_info=dataset_info, test_loaders=test_loaders)
-        print(f"Generated molecule: Positions {x[:-1, :, :]}")
-        wandb.log({"Generated molecule": wandb.Table(data=[[str(x[:-1,:,:])]], columns=["Sample"])})
+        wandb.log({"Generated molecule": wandb.Table(data=[[str(x[1,:,:])]], columns=["Sample"])})
         vis.save_xyz_file(f'outputs/{args.exp_name}/epoch_{epoch}_{batch_id}/', one_hot, charges, x, dataset_info,
                           batch_size * counter, name='molecule')
 
 
 def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info, prop_dist, test_loaders,
                      n_samples=1000, batch_size=100):
-    print(f'Analyzing molecule stability at epoch {epoch}...')
+    print(f'Sampling {n_samples} molecules at epoch {epoch} to calculate viability...')
     batch_size = min(batch_size, n_samples)
     assert n_samples % batch_size == 0
     molecules = {'one_hot': [], 'x': [], 'node_mask': []}

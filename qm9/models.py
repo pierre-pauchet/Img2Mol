@@ -56,7 +56,7 @@ def get_autoencoder(args, device, dataset_info, dataloader_train):
     in_node_nf = len(dataset_info['atom_decoder']) + int(args.include_charges)
     nodes_dist = DistributionNodes(histogram)
     phen_nf = dataset_info['phenotype_embedding_nf'] if args.conditioning_mode == 'cross_attention' else 0
-
+    print(nodes_dist.n_nodes)
     prop_dist = None
     if len(args.conditioning) > 0:
         prop_dist = DistributionProperty(dataloader_train, args.conditioning)

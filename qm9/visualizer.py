@@ -5,7 +5,7 @@ import glob
 import random
 import matplotlib
 import imageio
-
+import tqdm
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ from qm9 import bond_analyze
 ###########-->
 
 
-def save_xyz_file(path, one_hot, charges, positions, dataset_info, id_from=0, name='molecule', node_mask=None):
+def save_xyz_file(path, one_hot, charges, positions, dataset_info, sample_id=0, name='molecule', node_mask=None):
     try:
         os.makedirs(path)
     except OSError:
@@ -27,7 +27,8 @@ def save_xyz_file(path, one_hot, charges, positions, dataset_info, id_from=0, na
         atomsxmol = [one_hot.size(1)] * one_hot.size(0)
 
     for batch_i in range(one_hot.size(0)):
-        f = open(path + name + '_' + "%03d.txt" % (batch_i + id_from), "w")
+        
+        f = open(path + name + '_'+ '%02d' % (sample_id+1) +'_' + "%03d.txt" % (batch_i), "w")
         f.write("%d\n\n" % atomsxmol[batch_i])
         atoms = torch.argmax(one_hot[batch_i], dim=1)
         n_atoms = int(atomsxmol[batch_i])
@@ -71,27 +72,9 @@ def draw_sphere(ax, x, y, z, size, color, alpha):
     xs = size * np.outer(np.cos(u), np.sin(v))
     ys = size * np.outer(np.sin(u), np.sin(v)) * 0.8  # Correct for matplotlib.
     zs = size * np.outer(np.ones(np.size(u)), np.cos(v))
-    # for i in range(2):
-    #    ax.plot_surface(x+random.randint(-5,5), y+random.randint(-5,5), z+random.randint(-5,5),  rstride=4, cstride=4, color='b', linewidth=0, alpha=0.5)
 
     ax.plot_surface(x + xs, y + ys, z + zs, rstride=2, cstride=2, color=color, linewidth=0,
                     alpha=alpha)
-    # # calculate vectors for "vertical" circle
-    # a = np.array([-np.sin(elev / 180 * np.pi), 0, np.cos(elev / 180 * np.pi)])
-    # b = np.array([0, 1, 0])
-    # b = b * np.cos(rot) + np.cross(a, b) * np.sin(rot) + a * np.dot(a, b) * (
-    #             1 - np.cos(rot))
-    # ax.plot(np.sin(u), np.cos(u), 0, color='k', linestyle='dashed')
-    # horiz_front = np.linspace(0, np.pi, 100)
-    # ax.plot(np.sin(horiz_front), np.cos(horiz_front), 0, color='k')
-    # vert_front = np.linspace(np.pi / 2, 3 * np.pi / 2, 100)
-    # ax.plot(a[0] * np.sin(u) + b[0] * np.cos(u), b[1] * np.cos(u),
-    #         a[2] * np.sin(u) + b[2] * np.cos(u), color='k', linestyle='dashed')
-    # ax.plot(a[0] * np.sin(vert_front) + b[0] * np.cos(vert_front),
-    #         b[1] * np.cos(vert_front),
-    #         a[2] * np.sin(vert_front) + b[2] * np.cos(vert_front), color='k')
-    #
-    # ax.view_init(elev=elev, azim=0)
 
 
 def plot_molecule(ax, positions, atom_type, alpha, spheres_3d, hex_bg_color,
@@ -153,8 +136,9 @@ def plot_molecule(ax, positions, atom_type, alpha, spheres_3d, hex_bg_color,
                         c=hex_bg_color, alpha=alpha)
 
 
-def plot_data3d(positions, atom_type, dataset_info, camera_elev=0, camera_azim=0, save_path=None, spheres_3d=False,
+def plot_data3d(positions, atom_type, dataset_info, camera_elev=-90, camera_azim=90, save_path=None, spheres_3d=False,
                 bg='black', alpha=1.):
+    spheres_3d = False
     black = (0, 0, 0)
     white = (1, 1, 1)
     hex_bg_color = '#FFFFFF' if bg == 'black' else "#000000"
@@ -168,38 +152,43 @@ def plot_data3d(positions, atom_type, dataset_info, camera_elev=0, camera_azim=0
         ax.set_facecolor(black)
     else:
         ax.set_facecolor(white)
-    # ax.xaxis.pane.set_edgecolor('#D0D0D0')
-    ax.xaxis.pane.set_alpha(0)
-    ax.yaxis.pane.set_alpha(0)
-    ax.zaxis.pane.set_alpha(0)
-    ax._axis3don = False
+    ax.xaxis.pane.set_edgecolor('#D0D0D0')
+    max_value = positions.abs().max().item()
+    axis_lim = min(40, max(max_value / 1.5 + 0.3, 3.2)) # set arbitrarely by Minxai Xu ? Clip viewing  to [3.2, 40]
+    
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+
+    ax.xaxis.pane.set_alpha(0.1)
+    ax.yaxis.pane.set_alpha(0.1)
+    ax.zaxis.pane.set_alpha(0.1)
+    ax._axis3don = True
+
+    ax.set_xlim(-axis_lim, axis_lim)
+    ax.set_ylim(-axis_lim, axis_lim)
+    ax.set_zlim(-axis_lim, axis_lim)
+    ticks = np.linspace(-axis_lim, axis_lim, num=5)
+    ax.set_xticks(ticks)
+    ax.set_yticks(ticks)
+    # ax.set_zticks(ticks)
+    
+    ax.xaxis.set_tick_params(color='white', labelcolor='white')
+    ax.yaxis.set_tick_params(color='white', labelcolor='white')
+    # ax.zaxis.set_tick_params(color='white', labelcolor='white')
+
+    ax.xaxis.label.set_color('white')
+    ax.yaxis.label.set_color('white')
+    # ax.zaxis.label.set_color('white')
 
     if bg == 'black':
-        ax.w_xaxis.line.set_color("black")
-    else:
         ax.w_xaxis.line.set_color("white")
+    else:
+        ax.w_xaxis.line.set_color("black")
 
     plot_molecule(ax, positions, atom_type, alpha, spheres_3d,
                   hex_bg_color, dataset_info)
 
-    # if 'qm9' in dataset_info['name']:
-    max_value = positions.abs().max().item()
-
-        # axis_lim = 3.2
-    axis_lim = min(40, max(max_value / 1.5 + 0.3, 3.2))
-    ax.set_xlim(-axis_lim, axis_lim)
-    ax.set_ylim(-axis_lim, axis_lim)
-    ax.set_zlim(-axis_lim, axis_lim)
-    # elif dataset_info['name'] == 'geom':
-        # max_value = positions.abs().max().item()
-
-    #     # axis_lim = 3.2
-    #     axis_lim = min(40, max(max_value / 1.5 + 0.3, 3.2))
-    #     ax.set_xlim(-axis_lim, axis_lim)
-    #     ax.set_ylim(-axis_lim, axis_lim)
-    #     ax.set_zlim(-axis_lim, axis_lim)
-    # # else:
-    #     raise ValueError(dataset_info['name'])
 
     dpi = 120 if spheres_3d else 50
 
@@ -281,28 +270,43 @@ def plot_data3d_uncertainty(
     plt.close()
 
 
-def plot_grid():
+def plot_grid(save_path, nrows=4, ncols=4):
     import matplotlib.pyplot as plt
     from mpl_toolkits.axes_grid1 import ImageGrid
 
-    im1 = np.arange(100).reshape((10, 10))
-    im2 = im1.T
-    im3 = np.flipud(im1)
-    im4 = np.fliplr(im2)
+    epoch_folders = [f for f in os.listdir(save_path) if f.startswith("epoch_") and os.path.isdir(os.path.join(save_path, f))]
+    epoch_folders.sort(key=lambda x: int(x.split('_')[1]))  # Sort by epoch number
+    
+    gifs = []
+    epoch_labels = []
+    gif_files = []
+    epoch_labels = []
+    for folder in epoch_folders:
+        gif_file = os.path.join(save_path, folder, "output.gif")
+        if os.path.exists(gif_file):
+            gif_files.append(gif_file)
+            epoch_labels.append(int(folder.split('_')[1]))
 
-    fig = plt.figure(figsize=(10., 10.))
-    grid = ImageGrid(fig, 111,  # similar to subplot(111)
-                     nrows_ncols=(6, 6),  # creates 2x2 grid of axes
-                     axes_pad=0.1,  # pad between axes in inch.
-                     )
+    num_slots = nrows*ncols
+    num_gifs = len(gif_files)
+    
+    fig = plt.figure(figsize=(12, 12))
+    grid = ImageGrid(fig, 111, nrows_ncols=(nrows, ncols), axes_pad=0.5)
+    for ax, gif_file, epoch in zip(grid, gif_files, epoch_labels):
+        # Display first frame of GIF
+        gif = imageio.mimread(gif_file)
+        first_frame = gif[0]
+        ax.imshow(first_frame)
+        ax.axis("off")
+        ax.set_title(f'Epoch {epoch}')
 
-    for ax, im in zip(grid, [im1, im2, im3, im4]):
-        # Iterating over the grid returns the Axes.
-
-        ax.imshow(im)
-
-    plt.show()
-
+    # Fill the rest with plain
+    for ax in grid[num_gifs:]:
+        ax.axis("off")
+    exp_name = os.path.basename(save_path)
+    print(exp_name)
+    fig.suptitle(f'{exp_name}', fontsize=16)
+    imageio.mimsave(f"testgrid.gif")
 
 def visualize(path, dataset_info, max_num=25, wandb=None, spheres_3d=False):
     files = load_xyz_files(path)[0:max_num]
@@ -324,31 +328,70 @@ def visualize(path, dataset_info, max_num=25, wandb=None, spheres_3d=False):
 
 def visualize_chain(path, dataset_info, wandb=None, spheres_3d=False,
                     mode="chain"):
+    
     files = load_xyz_files(path)
     files = sorted(files)
-    save_paths = []
-
-    for i in range(len(files)):
-        file = files[i]
-
-        positions, one_hot, charges = load_molecule_xyz(file, dataset_info=dataset_info)
-
-        atom_type = torch.argmax(one_hot, dim=1).numpy()
-        fn = file[:-4] + '.png'
-        plot_data3d(positions, atom_type, dataset_info=dataset_info,
+    grid_paths = []
+    n_samples = int(files[-1].split('_')[-2])    
+    n_frames = int(files[-1].split('_')[-1].split('.')[0])
+    
+    cols=4
+    for n in range(1,5):
+        if n*n >= n_samples:
+            cols = n
+            print('cols', cols)
+            break
+    rows = cols
+    
+    for i in tqdm.tqdm(range(n_frames), dec='Generating gif...'):
+        files_to_plot = [f for f in files if f.endswith(f'_{i:03d}.txt')]
+        files_to_plot = sorted(files_to_plot, key=lambda f: int(f.split('_')[1]))
+        individual_paths = []
+        # Collect images at frame i
+        for file in files_to_plot:
+            positions, one_hot, charges = load_molecule_xyz(file, dataset_info=dataset_info)
+            atom_type = torch.argmax(one_hot, dim=1).numpy()
+            fn = file[:-4] + '.png'
+            plot_data3d(positions, atom_type, dataset_info=dataset_info,
                     save_path=fn, spheres_3d=spheres_3d, alpha=1.0)
-        save_paths.append(fn)
-
-    imgs = [imageio.imread(fn) for fn in save_paths]
-    dirname = os.path.dirname(save_paths[0])
+            individual_paths.append(fn)
+        
+        # Plot image grid
+        fig, axs = plt.subplots(rows, cols, figsize=(cols*4, rows*4))
+        axs = axs.flatten() if isinstance(axs, (np.ndarray, list)) else [axs]
+        individual_paths = sorted(individual_paths)
+        for ax_idx, ax in enumerate(axs):
+            ax.axis('off')
+            if ax_idx < len(individual_paths):
+                img = imageio.imread(individual_paths[ax_idx])
+                ax.imshow(img)
+                chain_n = int(individual_paths[ax_idx].split('_')[-2])
+                ax.set_title(f'Chain {chain_n}', fontsize=8)
+            else:
+                ax.set_visible(False)
+        
+        plt.suptitle("Dynamic denoising - Frame {:03d}".format(i), fontsize=12)
+        grid_fn = os.path.join(path, f'grid_{i:03d}.png')
+        grid_paths.append(grid_fn)
+        plt.tight_layout(rect=[0, 0, 1, 0.98])
+        plt.savefig(grid_fn, dpi=150)
+        plt.close(fig)
+        
+        # Delete the individual images after the grid is saved
+        for img_path in individual_paths:
+            if os.path.exists(img_path):
+                os.remove(img_path)
+                os.remove(img_path[:-4] + '.txt')
+        
+    grids = [imageio.imread(fn) for fn in grid_paths]
+    dirname = os.path.dirname(grid_paths[0])
     gif_path = dirname + '/output.gif'
-    print(f'Creating gif with {len(imgs)} images')
-    # Add the last frame 10 times so that the final result remains temporally.
-    # imgs.extend([imgs[-1]] * 10)
-    imageio.mimsave(gif_path, imgs, subrectangles=True)
+    print(f'Creating gif with {len(grids)} images')
+    imageio.mimsave(gif_path, grids, subrectangles=True)
 
     if wandb is not None:
         wandb.log({mode: [wandb.Video(gif_path, caption=gif_path)]})
+
 
 
 def visualize_chain_uncertainty(

@@ -52,12 +52,13 @@ def reverse_tensor(x):
 
 
 def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test_loaders=None, random_idx=False):
-    n_samples = 1
+    n_samples = 4
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
-    elif args.dataset == 'geom' or args.dataset == 'jump':
+    elif args.dataset == 'geom' :
         n_nodes = 44
-
+    elif args.dataset == 'jump':
+        n_nodes = 36
     else:
         raise ValueError()
 
@@ -70,14 +71,10 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
         context = None
     if args.conditioning_mode == 'cross_attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
-        n_collected = 0
         all_phenotypes = []
         for batch in test_loaders:
             emb = batch['embeddings'].clone()
             all_phenotypes.append(emb)
-            n_collected += 1
-            if n_collected >= n_nodes:
-                break
 
         all_phenotypes = torch.cat(all_phenotypes, dim=0).to(device)
         if random_idx:
@@ -96,23 +93,25 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
         one_hot, charges, x = None, None, None
         for i in range(n_tries):
             chain = flow.sample_chain(n_samples, n_nodes, node_mask, edge_mask, context, phenotypes, keep_frames=keep_frames)
+            # chain = chains[:chains.size(0) //n_samples] # take only the first chain
+            chain = chain.permute(1,0,2,3) # (n_samples, n_frames, n_nodes, 4 + args.include_charges)
             chain = reverse_tensor(chain)
 
             # Repeat last frame to see final sample better.
-            chain = torch.cat([chain, chain[-1:].repeat(10, 1, 1)], dim=0)
-            x = chain[-1:, :, 0:3]
-            one_hot = chain[-1:, :, 3:-1]
-            one_hot = torch.argmax(one_hot, dim=2)
+            chain = torch.cat([chain, chain[:, -1:, :, :].repeat(1, 10, 1, 1)], dim=1)
+            x = chain[:, -1:, :, 0:3]
+            one_hot = chain[:, -1:, :, 3:-1]
+            one_hot = torch.argmax(one_hot, dim=3)
 
-            atom_type = one_hot.squeeze(0).cpu().detach().numpy()
-            x_squeeze = x.squeeze(0).cpu().detach().numpy()
+            atom_type = one_hot[0].squeeze(0).cpu().detach().numpy()
+            x_squeeze = x[0].squeeze(0).cpu().detach().numpy()
             mol_stable = check_stability(x_squeeze, atom_type, dataset_info)[0]
 
             # Prepare entire chain.
-            x = chain[:, :, 0:3]
-            one_hot = chain[:, :, 3:-1]
-            one_hot = F.one_hot(torch.argmax(one_hot, dim=2), num_classes=len(dataset_info['atom_decoder']))
-            charges = torch.round(chain[:, :, -1:]).long()
+            x = chain[:, :, :, 0:3]
+            one_hot = chain[:, :, :, 3:-1]
+            one_hot = F.one_hot(torch.argmax(one_hot, dim=3), num_classes=len(dataset_info['atom_decoder']))
+            charges = torch.round(chain[:, :, :, -1:]).long()
 
             if mol_stable:
                 print('Found stable molecule to visualize :)')
@@ -128,7 +127,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
 
 def sample(args, device, generative_model, dataset_info,
            prop_dist=None, test_loaders=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
-           fix_noise=False):
+           fix_noise=False, random_idx=False):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
 
     assert int(torch.max(nodesxsample)) <= max_n_nodes
@@ -155,17 +154,17 @@ def sample(args, device, generative_model, dataset_info,
         context = None
     if args.conditioning_mode == 'cross_attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
-        n_collected = 0
-        phenotypes = []
+        all_phenotypes = []
         for batch in test_loaders:
             emb = batch['embeddings'].clone()
-            phenotypes.append(emb)
-            n_collected += 1
-            if n_collected >= batch_size:
-                break
+            all_phenotypes.append(emb)
 
-        phenotypes = torch.cat(phenotypes, dim=0).to(device)
-        # 1==1
+        all_phenotypes = torch.cat(all_phenotypes, dim=0).to(device)
+        if random_idx:
+                random_embedding_idx = torch.randint(0, all_phenotypes.size(0), (batch_size,))
+                phenotypes = all_phenotypes[random_embedding_idx]
+        else:
+            phenotypes = all_phenotypes[:batch_size]
     else: 
         phenotypes = None
     

@@ -104,7 +104,7 @@ parser.add_argument('--dequantization', type=str, default='argmax_variational',
                     help='uniform | variational | argmax_variational | deterministic')
 parser.add_argument('--n_report_steps', type=int, default=50)
 parser.add_argument('--wandb_usr', type=str)
-parser.add_argument('--no_wandb', action='store_true', help='Disable wandb')
+parser.add_argument('--no_wandb', type=bool, default=False, help='Disable wandb')
 parser.add_argument('--online', type=bool, default=True, help='True = wandb online -- False = wandb offline')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
@@ -161,6 +161,7 @@ atom_decoder = dataset_info['atom_decoder']
 args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
+
 if args.viability_metrics_epochs is None:
     args.viability_metrics_epochs = args.test_epochs
 
@@ -193,11 +194,7 @@ if args.resume is not None:
     print(args)
 
 utils.create_folders(args)
-# print(args)
 
-# Embeddings for conditioning
-    
-    
 # Wandb config
 if args.no_wandb:
     mode = 'disabled'
@@ -242,6 +239,8 @@ else:
         context_node_nf = context_dummy.size(2)
     elif args.conditioning_mode == 'naive': # Naive conditioning
         print(f'Conditioning on {args.conditioning_mode}')
+        property_norms = compute_mean_mad(dataloaders, args.conditioning, args.dataset)
+        context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
         embeddings = prepare_embeddings(data_dummy, verbose=True)
         context_node_nf = embeddings.size(2)
     elif args.conditioning_mode in ['cross_attention', 'other']: # Attention conditioning
@@ -285,8 +284,8 @@ def check_mask_correct(variables, node_mask):
 def main():
     print(args)
     if args.resume is not None:
-        flow_state_dict = torch.load(join(args.resume, 'flow.npy'))
-        optim_state_dict = torch.load(join(args.resume, 'optim.npy'))
+        flow_state_dict = torch.load(join(args.resume, 'generative_model_ema.npy'))
+        optim_state_dict = torch.load(join(args.resume, 'flow.npy'))
         model.load_state_dict(flow_state_dict)
         optim.load_state_dict(optim_state_dict)
 
@@ -313,8 +312,8 @@ def main():
         model_ema = model
         model_ema_dp = model_dp
 
-    best_nll_val = 1e8
-    best_nll_test = 1e8
+    best_nll_val = 1e10
+    best_nll_test = 1e10
     test_loaders = dataloaders['test']
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
@@ -338,25 +337,28 @@ def main():
                             partition='Test', device=device, dtype=dtype,
                             nodes_dist=nodes_dist, property_norms=property_norms)
 
-            if nll_val < best_nll_val:
+            if nll_val < best_nll_val or epoch ==0:
                 best_nll_val = nll_val
                 best_nll_test = nll_test
+                
+                #save best model over previous best
                 if args.save_model:
                     args.current_epoch = epoch + 1
-                    utils.save_model(optim, 'outputs/%s/optim.npy' % args.exp_name)
+                    utils.save_model(optim, 'outputs/%s/flow.npy' % args.exp_name)
                     utils.save_model(model, 'outputs/%s/generative_model.npy' % args.exp_name)
                     if args.ema_decay > 0:
                         utils.save_model(model_ema, 'outputs/%s/generative_model_ema.npy' % args.exp_name)
                     with open('outputs/%s/args.pickle' % args.exp_name, 'wb') as f:
                         pickle.dump(args, f)
-
-                if args.save_model:
-                    utils.save_model(optim, 'outputs/%s/optim_%d.npy' % (args.exp_name, epoch))
-                    utils.save_model(model, 'outputs/%s/generative_model_%d.npy' % (args.exp_name, epoch))
-                    if args.ema_decay > 0:
-                        utils.save_model(model_ema, 'outputs/%s/generative_model_ema_%d.npy' % (args.exp_name, epoch))
-                    with open('outputs/%s/args_%d.pickle' % (args.exp_name, epoch), 'wb') as f:
-                        pickle.dump(args, f)
+                        
+            #save current model
+            if args.save_model:
+                utils.save_model(optim, 'outputs/%s/optim_%d.npy' % (args.exp_name, epoch))
+                utils.save_model(model, 'outputs/%s/generative_model_%d.npy' % (args.exp_name, epoch))
+                if args.ema_decay > 0:
+                    utils.save_model(model_ema, 'outputs/%s/generative_model_ema_%d.npy' % (args.exp_name, epoch))
+                with open('outputs/%s/args_%d.pickle' % (args.exp_name, epoch), 'wb') as f:
+                    pickle.dump(args, f)
             print('Val loss: %.4f \t Test loss:  %.4f' % (nll_val, nll_test))
             print('Best val loss: %.4f \t Best test loss:  %.4f' % (best_nll_val, best_nll_test))
             wandb.log({"Val loss ": nll_val, "Epoch":epoch}, commit=True)

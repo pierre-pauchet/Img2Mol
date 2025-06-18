@@ -112,7 +112,7 @@ def gaussian_KL_for_dimension(q_mu, q_sigma, p_mu, p_sigma, d):
             The KL distance, summed over all dimensions except the batch dim.
         """
     mu_norm2 = sum_except_batch((q_mu - p_mu)**2)
-    assert len(q_sigma.size()) == 1
+    assert len(q_sigma.size()) == 1, f'Expected q_sigma to have only batch dimension, got {q_sigma.size()}'
     assert len(p_sigma.size()) == 1
     return (d * torch.log(p_sigma / (q_sigma + 1e-8) + 1e-8) 
             + 0.5 * (d * q_sigma**2 + mu_norm2) / (p_sigma**2) 
@@ -416,8 +416,8 @@ class EnVariationalDiffusion(torch.nn.Module):
         mu_T_x, mu_T_h = mu_T[:, :, :self.n_dims], mu_T[:, :, self.n_dims:]
 
         # Compute standard deviations (only batch axis for x-part, inflated for h-part).
-        sigma_T_x = self.sigma(gamma_T, mu_T_x).squeeze()  # Remove inflate, only keep batch dimension for x-part.
-        sigma_T_h = self.sigma(gamma_T, mu_T_h)
+        sigma_T_x = self.sigma(gamma_T, mu_T_x).squeeze(2).squeeze(1)# Remove inflate, only keep batch dimension for x-part.
+        sigma_T_h = self.sigma(gamma_T, mu_T_h) if gamma_T.shape[0]!= 1 else self.sigma(gamma_T, mu_T_x).squeeze(1)  
 
         # Compute KL for h-part.
         zeros, ones = torch.zeros_like(mu_T_h), torch.ones_like(sigma_T_h)
@@ -426,6 +426,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         # Compute KL for x-part.
         zeros, ones = torch.zeros_like(mu_T_x), torch.ones_like(sigma_T_x)
         subspace_d = self.subspace_dimensionality(node_mask)
+
         kl_distance_x = gaussian_KL_for_dimension(mu_T_x, sigma_T_x, zeros, ones, d=subspace_d)
 
         return kl_distance_x + kl_distance_h
@@ -1226,9 +1227,9 @@ class EnLatentDiffusion(EnVariationalDiffusion):
             xh = torch.cat([x, h['categorical'], h['integer']], dim=2)
             chain_decoded[i] = xh
         
-        chain_decoded_flat = chain_decoded.view(n_samples * keep_frames, *chain_decoded.size()[2:])
+        # chain_decoded_flat = chain_decoded.view(n_samples * keep_frames, *chain_decoded.size()[2:])
 
-        return chain_decoded_flat
+        return chain_decoded
 
     def instantiate_first_stage(self, vae: EnHierarchicalVAE):
         if not self.trainable_ae:
