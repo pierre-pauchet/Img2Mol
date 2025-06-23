@@ -16,7 +16,7 @@ import argparse
 import wandb
 from configs.datasets_config import get_dataset_info
 from os.path import join
-import build_jump_dataset
+from qm9 import dataset
 from qm9.models import get_optim, get_autoencoder, get_latent_diffusion
 from equivariant_diffusion import en_diffusion
 from equivariant_diffusion.utils import assert_correctly_masked
@@ -104,7 +104,7 @@ parser.add_argument('--dequantization', type=str, default='argmax_variational',
                     help='uniform | variational | argmax_variational | deterministic')
 parser.add_argument('--n_report_steps', type=int, default=50)
 parser.add_argument('--wandb_usr', type=str)
-parser.add_argument('--no_wandb', type=bool, default=False, help='Disable wandb')
+parser.add_argument('--no_wandb', action='store_true', default=False, help='Disable wandb')
 parser.add_argument('--online', type=bool, default=True, help='True = wandb online -- False = wandb offline')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
@@ -161,6 +161,7 @@ atom_decoder = dataset_info['atom_decoder']
 args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
+args.device = device
 
 if args.viability_metrics_epochs is None:
     args.viability_metrics_epochs = args.test_epochs
@@ -207,20 +208,7 @@ wandb.save('*.txt')
 
 
 # Build Jump Dataset
-split_data = build_jump_dataset.load_split_data(args.data_file, val_proportion=0.1, test_proportion=0.1, filter_size=args.filter_molecule_size)
-transform = build_jump_dataset.JumpTransform(dataset_info, args.include_charges, device, args.sequential)
-dataloaders = {}
-for key, data_list in zip(['train', 'valid', 'test'], split_data):
-    dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, percent_train_ds=args.percent_train_ds)
-    shuffle = (key == 'train') and not args.sequential
-
-    # Sequential dataloading disabled for now.
-    dataloaders[key] = build_jump_dataset.JumpDataLoader(
-        sequential=args.sequential, dataset=dataset, batch_size=args.batch_size,
-        shuffle=shuffle)
-
-
-del split_data
+dataloaders, charge_scale = dataset.retrieve_dataloaders(args)
 
 atom_encoder = dataset_info['atom_encoder']
 atom_decoder = dataset_info['atom_decoder']
@@ -257,7 +245,6 @@ args.context_node_nf = context_node_nf
 
 
 # Create Latent Diffusion Model or Audoencoder
-device = torch.device("cuda" if args.cuda else "cpu")
 
 if args.train_diffusion:
     model, nodes_dist, prop_dist = get_latent_diffusion(args, device, dataset_info, dataloaders['train'])
@@ -313,7 +300,7 @@ def main():
         model_ema_dp = model_dp
 
     best_nll_val = 1e10
-    best_nll_test = 1e10
+    best_nll_test = 1e1
     test_loaders = dataloaders['test']
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
@@ -330,12 +317,13 @@ def main():
                                  dataset_info=dataset_info, device=device,
                                  prop_dist=prop_dist, n_samples=args.n_stability_samples,
                                  test_loaders=test_loaders)
+                nll_test = test(args=args, loader=dataloaders['test'], epoch=epoch, eval_model=model_ema_dp,
+                partition='Test', device=device, dtype=dtype,
+                nodes_dist=nodes_dist, property_norms=property_norms)
             nll_val = test(args=args, loader=dataloaders['valid'], epoch=epoch, eval_model=model_ema_dp,
                            partition='Val', device=device, dtype=dtype, nodes_dist=nodes_dist,
                            property_norms=property_norms)
-            nll_test = test(args=args, loader=dataloaders['test'], epoch=epoch, eval_model=model_ema_dp,
-                            partition='Test', device=device, dtype=dtype,
-                            nodes_dist=nodes_dist, property_norms=property_norms)
+
 
             if nll_val < best_nll_val or epoch ==0:
                 best_nll_val = nll_val
@@ -352,13 +340,13 @@ def main():
                         pickle.dump(args, f)
                         
             #save current model
-            if args.save_model:
-                utils.save_model(optim, 'outputs/%s/optim_%d.npy' % (args.exp_name, epoch))
-                utils.save_model(model, 'outputs/%s/generative_model_%d.npy' % (args.exp_name, epoch))
-                if args.ema_decay > 0:
-                    utils.save_model(model_ema, 'outputs/%s/generative_model_ema_%d.npy' % (args.exp_name, epoch))
-                with open('outputs/%s/args_%d.pickle' % (args.exp_name, epoch), 'wb') as f:
-                    pickle.dump(args, f)
+            # if args.save_model:
+            #     utils.save_model(optim, 'outputs/%s/optim_%d.npy' % (args.exp_name, epoch))
+            #     utils.save_model(model, 'outputs/%s/generative_model_%d.npy' % (args.exp_name, epoch))
+            #     if args.ema_decay > 0:
+            #         utils.save_model(model_ema, 'outputs/%s/generative_model_ema_%d.npy' % (args.exp_name, epoch))
+            #     with open('outputs/%s/args_%d.pickle' % (args.exp_name, epoch), 'wb') as f:
+            #         pickle.dump(args, f)
             print('Val loss: %.4f \t Test loss:  %.4f' % (nll_val, nll_test))
             print('Best val loss: %.4f \t Best test loss:  %.4f' % (best_nll_val, best_nll_test))
             wandb.log({"Val loss ": nll_val, "Epoch":epoch}, commit=True)

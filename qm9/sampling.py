@@ -88,14 +88,15 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
     node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
     edge_mask = (1 - torch.eye(n_nodes)).unsqueeze(0)
     edge_mask = edge_mask.repeat(n_samples, 1, 1).view(-1, 1).to(device)
-    keep_frames = min(100, args.n_stability_samples)
+    keep_frames = min(40, args.n_stability_samples)
     if args.probabilistic_model == 'diffusion':
         one_hot, charges, x = None, None, None
         for i in range(n_tries):
             chain = flow.sample_chain(n_samples, n_nodes, node_mask, edge_mask, context, phenotypes, keep_frames=keep_frames)
             # chain = chains[:chains.size(0) //n_samples] # take only the first chain
-            chain = chain.permute(1,0,2,3) # (n_samples, n_frames, n_nodes, 4 + args.include_charges)
             chain = reverse_tensor(chain)
+        
+            chain = chain.permute(1,0,2,3) # (n_samples, n_frames, n_nodes, 4 + args.include_charges)
 
             # Repeat last frame to see final sample better.
             chain = torch.cat([chain, chain[:, -1:, :, :].repeat(1, 10, 1, 1)], dim=1)

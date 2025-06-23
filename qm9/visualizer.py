@@ -143,7 +143,6 @@ def plot_data3d(positions, atom_type, dataset_info, camera_elev=-90, camera_azim
     white = (1, 1, 1)
     hex_bg_color = '#FFFFFF' if bg == 'black' else "#000000"
 
-    from mpl_toolkits.mplot3d import Axes3D
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.set_aspect('auto')
@@ -211,7 +210,6 @@ def plot_data3d_uncertainty(
     white = (1, 1, 1)
     hex_bg_color = '#FFFFFF' if bg == 'black' else '#666666'
 
-    from mpl_toolkits.mplot3d import Axes3D
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.set_aspect('auto')
@@ -270,43 +268,6 @@ def plot_data3d_uncertainty(
     plt.close()
 
 
-def plot_grid(save_path, nrows=4, ncols=4):
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.axes_grid1 import ImageGrid
-
-    epoch_folders = [f for f in os.listdir(save_path) if f.startswith("epoch_") and os.path.isdir(os.path.join(save_path, f))]
-    epoch_folders.sort(key=lambda x: int(x.split('_')[1]))  # Sort by epoch number
-    
-    gifs = []
-    epoch_labels = []
-    gif_files = []
-    epoch_labels = []
-    for folder in epoch_folders:
-        gif_file = os.path.join(save_path, folder, "output.gif")
-        if os.path.exists(gif_file):
-            gif_files.append(gif_file)
-            epoch_labels.append(int(folder.split('_')[1]))
-
-    num_slots = nrows*ncols
-    num_gifs = len(gif_files)
-    
-    fig = plt.figure(figsize=(12, 12))
-    grid = ImageGrid(fig, 111, nrows_ncols=(nrows, ncols), axes_pad=0.5)
-    for ax, gif_file, epoch in zip(grid, gif_files, epoch_labels):
-        # Display first frame of GIF
-        gif = imageio.mimread(gif_file)
-        first_frame = gif[0]
-        ax.imshow(first_frame)
-        ax.axis("off")
-        ax.set_title(f'Epoch {epoch}')
-
-    # Fill the rest with plain
-    for ax in grid[num_gifs:]:
-        ax.axis("off")
-    exp_name = os.path.basename(save_path)
-    print(exp_name)
-    fig.suptitle(f'{exp_name}', fontsize=16)
-    imageio.mimsave(f"testgrid.gif")
 
 def visualize(path, dataset_info, max_num=25, wandb=None, spheres_3d=False):
     files = load_xyz_files(path)[0:max_num]
@@ -335,17 +296,17 @@ def visualize_chain(path, dataset_info, wandb=None, spheres_3d=False,
     n_samples = int(files[-1].split('_')[-2])    
     n_frames = int(files[-1].split('_')[-1].split('.')[0])
     
-    cols=4
-    for n in range(1,5):
-        if n*n >= n_samples:
+    cols = 4
+    for n in range(1, 5):
+        if n * n >= n_samples:
             cols = n
             print('cols', cols)
             break
     rows = cols
     
-    for i in tqdm.tqdm(range(n_frames), dec='Generating gif...'):
+    for i in tqdm.tqdm(range(n_frames), desc='Generating gif...'):
         files_to_plot = [f for f in files if f.endswith(f'_{i:03d}.txt')]
-        files_to_plot = sorted(files_to_plot, key=lambda f: int(f.split('_')[1]))
+        files_to_plot = sorted(files_to_plot, key=lambda f: int((f.split('_')[-2])))         
         individual_paths = []
         # Collect images at frame i
         for file in files_to_plot:
@@ -359,7 +320,6 @@ def visualize_chain(path, dataset_info, wandb=None, spheres_3d=False,
         # Plot image grid
         fig, axs = plt.subplots(rows, cols, figsize=(cols*4, rows*4))
         axs = axs.flatten() if isinstance(axs, (np.ndarray, list)) else [axs]
-        individual_paths = sorted(individual_paths)
         for ax_idx, ax in enumerate(axs):
             ax.axis('off')
             if ax_idx < len(individual_paths):
@@ -383,6 +343,8 @@ def visualize_chain(path, dataset_info, wandb=None, spheres_3d=False,
                 os.remove(img_path)
                 os.remove(img_path[:-4] + '.txt')
         
+    
+    grid_paths = sorted(grid_paths, key=lambda f: int((f.split('_')[-1]).split('.')[0]))
     grids = [imageio.imread(fn) for fn in grid_paths]
     dirname = os.path.dirname(grid_paths[0])
     gif_path = dirname + '/output.gif'

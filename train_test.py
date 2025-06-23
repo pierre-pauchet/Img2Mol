@@ -28,8 +28,7 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
         charges = (data['charges'].to(device, dtype) if args.include_charges else torch.zeros(0))
         phenotypes = (data['embeddings'].to(device) if args.conditioning_mode == 'cross_attention' else None)
         x = remove_mean_with_mask(x, node_mask)
-        if i==0 and args.conditioning_mode == 'cross_attention':
-            print(phenotypes[0])
+
         if args.augment_noise > 0:
             # Add noise eps ~ N(0, augment_noise) around points.
             eps = sample_center_gravity_zero_gaussian_with_mask(x.size(), x.device, node_mask)
@@ -209,7 +208,8 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
 
     wandb.log(validity_dict)
     if rdkit_tuple is not None:
-        wandb.log({'Validity': rdkit_tuple[0][0], 'Uniqueness': rdkit_tuple[0][1], 'Novelty': rdkit_tuple[0][2]})
+        wandb.log({'Validity': rdkit_tuple[0][0], 'Uniqueness': rdkit_tuple[0][1], 'Novelty': rdkit_tuple[0][2],
+                   'Connectivity': rdkit_tuple[0][3]})    
     return validity_dict
 
 

@@ -1,10 +1,13 @@
+
+import sys
+sys.path.append('/projects/iktos/pierre/CondGeoLDM/')  # Absolute path to project root
 try:
     from rdkit import Chem
     from qm9.rdkit_functions import BasicMolecularMetrics
     use_rdkit = True
 except ModuleNotFoundError:
     use_rdkit = False
-import qm9.dataset as dataset
+import qm9 as dataset
 import torch
 import matplotlib
 matplotlib.use('Agg')
@@ -13,7 +16,7 @@ import numpy as np
 import scipy.stats as sp_stats
 from qm9 import bond_analyze
 
-
+import os
 # 'atom_decoder': ['H', 'B', 'C', 'N', 'O', 'F', 'Al', 'Si', 'P', 'S', 'Cl', 'As', 'Br', 'I', 'Hg', 'Bi'],
 
 analyzed_19 ={'atom_types': {1: 93818, 3: 21212, 0: 139496, 2: 8251, 4: 26},
@@ -262,22 +265,23 @@ def process_loader(dataloader):
 def main_check_stability(remove_h: bool, batch_size=32):
     from configs import datasets_config
     import qm9.dataset as dataset
-
     class Config:
         def __init__(self):
             self.batch_size = batch_size
-            self.num_workers = 0
-            self.remove_h = remove_h
+            self.num_workers = 8
+            self.remove_h = True
             self.filter_n_atoms = None
-            self.datadir = 'qm9/temp'
-            self.dataset = 'qm9'
+            self.datadir = '/projects/iktos/pierre/CondGeoLDM/charac.npy'
+            self.dataset = 'jump'
             self.include_charges = True
             self.filter_molecule_size = None
             self.sequential = False
+            self.percent_train_ds = 5
+            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     cfg = Config()
 
-    dataset_info = datasets_config.qm9_with_h
+    dataset_info = datasets_config.jump
     dataloaders, charge_scale = dataset.retrieve_dataloaders(cfg)
     if use_rdkit:
         from qm9.rdkit_functions import BasicMolecularMetrics
@@ -306,8 +310,8 @@ def main_check_stability(remove_h: bool, batch_size=32):
                   f"{100. * count_atm_stable/count_atm_total:.2f} \t"
                   f"Counted molecules {count_mol_total}/{len(dataloader)*batch_size}")
 
-    train_loader = process_loader(dataloaders['train'])
-    test_loader = process_loader(dataloaders['test'])
+    train_loader = dataloaders['train']
+    test_loader = dataloaders['test']
     if use_rdkit:
         print('For test')
         metrics.evaluate(test_loader)

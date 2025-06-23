@@ -104,9 +104,7 @@ def load_split_data(conformation_file, val_proportion=0.1, test_proportion=0.1,
     num_mol = len(data_list)
     val_index = int(num_mol * val_proportion)
     test_index = val_index + int(num_mol * test_proportion)
-    train_data = data_list[:val_index]
-    val_data = data_list[val_index:test_index]
-    test_data = data_list[test_index:]
+    val_data, test_data, train_data = np.split(data_list, [val_index, test_index])
     return train_data, val_data, test_data
 
 

@@ -57,7 +57,8 @@ def retrieve_dataloaders(cfg):
                                                           cfg.sequential)
         dataloaders = {}
         for key, data_list in zip(['train', 'valid', 'test'], split_data):
-            dataset = build_jump_dataset.JumpDataset(data_list, transform=transform, n_debug_samples=None)
+            dataset = build_jump_dataset.JumpDataset(data_list, transform=transform,
+                                                     percent_train_ds=cfg.percent_train_ds)
             shuffle = (key == 'train') and not cfg.sequential
 
             # Sequential dataloading disabled for now.
@@ -70,7 +71,7 @@ def retrieve_dataloaders(cfg):
     elif 'geom' in cfg.dataset:
         import build_geom_dataset
         from configs.datasets_config import get_dataset_info
-        data_file = './data/geom/geom_drugs_30.npy'
+        data_file = '/projects/iktos/pierre/CondGeoLDM/data/geom/geom_drugs_30.npy'
         dataset_info = get_dataset_info(cfg.dataset, cfg.remove_h)
 
         # Retrieve QM9 dataloaders

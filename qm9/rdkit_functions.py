@@ -110,6 +110,7 @@ class BasicMolecularMetrics(object):
         """ generated: list of couples (positions, atom_types)"""
         valid = []
         connected = []
+        valid_mols = []
         for graph in generated:
             mol = build_molecule(*graph, self.dataset_info)
             smiles = mol2smiles(mol)
@@ -120,7 +121,7 @@ class BasicMolecularMetrics(object):
                 largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
                 smiles = mol2smiles(largest_mol)
                 valid.append(smiles)
-        return valid, len(valid) / len(generated), len(connected) / len(generated)
+        return valid, len(valid) / len(generated), len(connected) / len(generated), valid_mols
 
     def compute_uniqueness(self, valid):
         """ valid: list of SMILES strings."""
@@ -134,11 +135,90 @@ class BasicMolecularMetrics(object):
                 novel.append(smiles)
                 num_novel += 1
         return novel, num_novel / len(unique)
+    def compute_molecules_stability_from_graph(self, adjacency_matrices, numbers, charges, allowed_bonds=None,
+        aromatic=True):
+        if adjacency_matrices.ndim == 2:
+            adjacency_matrices = adjacency_matrices.unsqueeze(0)
+            numbers = numbers.unsqueeze(0)
+            charges = charges.unsqueeze(0)
 
+        if allowed_bonds is None:
+            allowed_bonds = None
+
+        if not aromatic:
+            assert (adjacency_matrices == 1.5).sum() == 0 and (adjacency_matrices == 4).sum() == 0
+
+        batch_size = adjacency_matrices.shape[0]
+        stable_mask = torch.zeros(batch_size)
+        n_stable_atoms = torch.zeros(batch_size)
+        n_atoms = torch.zeros(batch_size)
+
+        for i in range(batch_size):
+            adj = adjacency_matrices[i]
+            atom_nums = numbers[i]
+            atom_charges = charges[i]
+
+            mol_stable = True
+            n_atoms_i, n_stable_i = 0, 0
+
+            for j, (a_num, charge) in enumerate(zip(atom_nums, atom_charges)):
+                if a_num.item() == 0:
+                    continue
+                row = adj[j]
+                aromatic_count = int((row == 1.5).sum().item())
+                normal_valence = float((row * (row != 1.5)).sum().item())
+                combo = (aromatic_count, int(normal_valence))
+                symbol = Chem.GetPeriodicTable().GetElementSymbol(int(a_num))
+                allowed = allowed_bonds.get(symbol, {})
+
+                # if _is_valid_valence_tuple(combo, allowed, int(charge)):
+                #     n_stable_i += 1
+                # else:
+                #     mol_stable = False
+
+                n_atoms_i += 1
+
+            stable_mask[i] = float(mol_stable)
+            n_stable_atoms[i] = n_stable_i
+            n_atoms[i] = n_atoms_i
+
+        return stable_mask, n_stable_atoms, n_atoms
+    def compute_molecules_stability(self, valid_mols, aromatic=False, allowed_bonds=None):
+        stable_list, stable_atoms_list, atom_counts_list = [], [], []
+
+        
+        for mol in valid_mols:
+            if mol is None:
+                continue
+            n_atoms = mol.GetNumAtoms()
+            adj = torch.zeros((1, n_atoms, n_atoms))
+            numbers = torch.zeros((1, n_atoms), dtype=torch.long)
+            charges = torch.zeros((1, n_atoms), dtype=torch.long)
+
+            for atom in mol.GetAtoms():
+                idx = atom.GetIdx()
+                numbers[0, idx] = atom.GetAtomicNum()
+                charges[0, idx] = atom.GetFormalCharge()
+
+            for bond in mol.GetBonds():
+                i = bond.GetBeginAtomIdx()
+                j = bond.GetEndAtomIdx()
+                bond_type = bond.GetBondTypeAsDouble()
+                adj[0, i, j] = adj[0, j, i] = bond_type
+
+            # stable, stable_atoms, atom_count = compute_molecules_stability_from_graph(
+            #     adj, numbers, charges, allowed_bonds, aromatic
+            # )
+            # stable_list.append(stable.item())
+            # stable_atoms_list.append(stable_atoms.item())
+            # atom_counts_list.append(atom_count.item())
+            
+
+        
     def evaluate(self, generated):
         """ generated: list of pairs (positions: n x 3, atom_types: n [int])
             the positions and atom types should already be masked. """
-        valid, validity, connectivity = self.compute_validity_and_connectivity(generated)
+        valid, validity, connectivity, _ = self.compute_validity_and_connectivity(generated)
         print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
         if validity > 0:
             unique, uniqueness = self.compute_uniqueness(valid)
@@ -155,6 +235,7 @@ class BasicMolecularMetrics(object):
             unique = None
             connectivity = 0.0
         return [validity, uniqueness, novelty, connectivity], unique
+    
 
 
 def mol2smiles(mol):

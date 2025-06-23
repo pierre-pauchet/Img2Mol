@@ -147,11 +147,14 @@ args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
 dtype = torch.float32
 
-split_data = build_geom_dataset.load_split_data(data_file, val_proportion=0.1, test_proportion=0.1, filter_size=args.filter_molecule_size)
-transform = build_geom_dataset.GeomDrugsTransform(dataset_info, args.include_charges, device, args.sequential)
+split_data = build_geom_dataset.load_split_data(data_file, val_proportion=0.1, test_proportion=0.1, 
+                                                filter_size=args.filter_molecule_size)
+transform = build_geom_dataset.GeomDrugsTransform(dataset_info, args.include_charges, device, 
+                                                  args.sequential)
 dataloaders = {}
 for key, data_list in zip(['train', 'val', 'test'], split_data):
-    dataset = build_geom_dataset.GeomDrugsDataset(data_list, transform=transform, percent_train_ds=args.percent_train_ds)
+    dataset = build_geom_dataset.GeomDrugsDataset(data_list, transform=transform, 
+                                                  percent_train_ds=args.percent_train_ds,)
     shuffle = (key == 'train') and not args.sequential
 
     # Sequential dataloading disabled for now.
