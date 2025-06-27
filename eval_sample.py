@@ -4,6 +4,8 @@ try:
 except ModuleNotFoundError:
     pass
 
+import os 
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 import utils
 import argparse
 from configs.datasets_config import qm9_with_h, qm9_without_h, jump
@@ -26,8 +28,8 @@ def check_mask_correct(variables, node_mask):
 
 
 def save_and_sample_chain(args, eval_args, device, flow,
-                          n_tries, n_nodes, dataset_info, id_from=0,
-                          num_chains=100):
+                          n_tries, n_nodes, dataset_info, sample_id=0,
+                          num_chains=10):
 
     for i in range(num_chains):
         target_path = f'eval/chain_{i}/'
@@ -37,7 +39,7 @@ def save_and_sample_chain(args, eval_args, device, flow,
 
         vis.save_xyz_file(
             join(eval_args.model_path, target_path), one_hot, charges, x,
-            dataset_info, id_from, name='chain')
+            dataset_info, sample_id, name='chain')
 
         vis.visualize_chain_uncertainty(
             join(eval_args.model_path, target_path), dataset_info,
@@ -55,7 +57,7 @@ def sample_different_sizes_and_save(args, eval_args, device, generative_model,
 
     vis.save_xyz_file(
         join(eval_args.model_path, 'eval/molecules/'), one_hot, charges, x,
-        id_from=0, name='molecule', dataset_info=dataset_info,
+        sample_id=0, name='molecule', dataset_info=dataset_info,
         node_mask=node_mask)
 
 
@@ -85,7 +87,7 @@ def sample_only_stable_different_sizes_and_save(
             vis.save_xyz_file(
                 join(eval_args.model_path, 'eval/molecules/'),
                 one_hot[i:i+1], charges[i:i+1], x[i:i+1],
-                id_from=counter, name='molecule_stable',
+                sample_id=counter, name='molecule_stable',
                 dataset_info=dataset_info,
                 node_mask=node_mask[i:i+1])
             counter += 1
@@ -97,12 +99,12 @@ def sample_only_stable_different_sizes_and_save(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str,
-                        default="outputs/edm_1",
+                        default="CondGeoLDM/outputs/geom_pretrained",
                         help='Specify model path')
     parser.add_argument(
         '--n_tries', type=int, default=10,
         help='N tries to find stable molecule for gif animation')
-    parser.add_argument('--n_nodes', type=int, default=19,
+    parser.add_argument('--n_nodes', type=int, default=36,
                         help='number of atoms in molecule for gif animation')
 
     eval_args, unparsed_args = parser.parse_known_args()
@@ -117,6 +119,8 @@ def main():
         args.normalization_factor = 1
     if not hasattr(args, 'aggregation_method'):
         args.aggregation_method = 'sum'
+    if not hasattr(args, 'conditioning_mode'):
+        args.conditioning_mode = 'original'
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -142,7 +146,7 @@ def main():
     print('Sampling handful of molecules.')
     sample_different_sizes_and_save(
         args, eval_args, device, flow, nodes_dist,
-        dataset_info=dataset_info, n_samples=30)
+        dataset_info=dataset_info, n_samples=10)
 
     print('Sampling stable molecules.')
     sample_only_stable_different_sizes_and_save(

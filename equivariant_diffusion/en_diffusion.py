@@ -757,7 +757,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         return z
 
     @torch.no_grad()
-    def sample(self, n_samples, n_nodes, node_mask, edge_mask, context, phenotypes, fix_noise=False):
+    def sample(self, n_samples, n_nodes, node_mask, edge_mask, context, phenotypes, fix_noise=False, n_steps=1000):
         """
         Draw samples from the generative model.
         """
@@ -769,13 +769,22 @@ class EnVariationalDiffusion(torch.nn.Module):
 
         diffusion_utils.assert_mean_zero_with_mask(z[:, :, :self.n_dims], node_mask)
 
-        # Iteratively sample p(z_s | z_t) for t = 1, ..., T, with s = t - 1.
-        for s in tqdm.tqdm(reversed(range(0, self.T))):
-            s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
+        # # Iteratively sample p(z_s | z_t) for t = 1, ..., T, with s = t - 1.
+        # for s in tqdm.tqdm(reversed(range(0, self.T))):
+        #     s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
+        #     t_array = s_array + 1
+        #     s_array = s_array / self.T
+        #     t_array = t_array / self.T
+
+        #     z = self.sample_p_zs_given_zt(s_array, t_array, z, node_mask, edge_mask, context, phenotypes, fix_noise=fix_noise)
+
+        discrete_steps = np.linspace(0, self.T, n_steps, dtype=int, endpoint=False)
+
+        for s in tqdm.tqdm(reversed(discrete_steps)):
+            s_array = torch.full((n_samples, 1), fill_value=int(s), device=z.device)
             t_array = s_array + 1
             s_array = s_array / self.T
             t_array = t_array / self.T
-
             z = self.sample_p_zs_given_zt(s_array, t_array, z, node_mask, edge_mask, context, phenotypes, fix_noise=fix_noise)
 
         # Finally sample p(x, h | z_0).

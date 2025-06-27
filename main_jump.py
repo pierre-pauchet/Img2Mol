@@ -9,6 +9,7 @@ try:
     from rdkit import Chem
 except ModuleNotFoundError:
     pass
+import os
 from configs.datasets_config import jump
 import copy
 import utils
@@ -141,7 +142,7 @@ parser.add_argument("--conditioning", nargs='+', default=[],
                     help='arguments : homo | lumo | alpha | gap | mu | Cv' )
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other') #maybe i should default to a no cond mode
-parser.add_argument('--data_file', type=str, default='/projects/iktos/pierre/CondGeoLDM/charac.npy')
+parser.add_argument('--data_file', type=str, default='/projects/iktos/pierre/CondGeoLDM/charac_new.npy')
 parser.add_argument('--filter_molecule_size', type=int, default=None)
 parser.add_argument('--sequential', type=bool, default=False)
 parser.add_argument('--percent_train_ds', type=int, default=None,

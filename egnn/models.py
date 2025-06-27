@@ -102,7 +102,7 @@ class EGNN_dynamics_QM9(nn.Module):
         vel = vel.view(bs, n_nodes, -1)
 
         if torch.any(torch.isnan(vel)):
-            print('Warning: detected nan, resetting EGNN output to zero.')
+            print('Warning: detected nan in dynamics, resetting EGNN output to zero.')
             vel = torch.zeros_like(vel)
 
         if node_mask is None:
@@ -228,7 +228,7 @@ class EGNN_encoder_QM9(nn.Module):
         vel = vel.view(bs, n_nodes, -1)
 
         if torch.any(torch.isnan(vel)):
-            print('Warning: detected nan, resetting EGNN output to zero.')
+            print('Warning: detected nan in dec, resetting EGNN output to zero.')
             vel = torch.zeros_like(vel)
 
         if node_mask is None:
@@ -369,7 +369,7 @@ class EGNN_decoder_QM9(nn.Module):
         vel = vel.view(bs, n_nodes, -1)
 
         if torch.any(torch.isnan(vel)):
-            print('Warning: detected nan, resetting EGNN output to zero.')
+            print('Warning: detected nan in enc, resetting EGNN output to zero.')
             vel = torch.zeros_like(vel)
 
         if node_mask is None:

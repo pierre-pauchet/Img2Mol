@@ -164,12 +164,14 @@ def save_and_sample_chain(model, args, device, dataset_info, prop_dist, test_loa
                           epoch=0, id_from=0, batch_id=''):
     if hasattr(model, 'module'):
         model = model.module
-    one_hot, charges, x = sample_chain(args=args, device=device, flow=model,
+    one_hot, charges, x, node_mask = sample_chain(args=args, device=device, flow=model,
                                        n_tries=1, dataset_info=dataset_info, prop_dist=prop_dist, test_loaders=test_loaders)
-    
+
     for sample_id in range(one_hot.size(0)):
         vis.save_xyz_file(f'outputs/{args.exp_name}/epoch_{epoch}_{batch_id}/chain/',
-                      one_hot[sample_id], charges[sample_id], x[sample_id], dataset_info, sample_id, name='chain')
+                      one_hot[sample_id], charges[sample_id], x[sample_id], dataset_info, sample_id, name='chain', 
+                      node_mask=node_mask[sample_id]
+                    )
 
     return one_hot, charges, x
 
@@ -188,7 +190,7 @@ def sample_different_sizes_and_save(model, nodes_dist, args, device, dataset_inf
 
 
 def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info, prop_dist, test_loaders,
-                     n_samples=1000, batch_size=100):
+                     n_samples=1000, batch_size=500):
     print(f'Sampling {n_samples} molecules at epoch {epoch} to calculate viability...')
     batch_size = min(batch_size, n_samples)
     assert n_samples % batch_size == 0
@@ -207,6 +209,9 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
     validity_dict, rdkit_tuple = analyze_stability_for_molecules(molecules, dataset_info)
 
     wandb.log(validity_dict)
+    print("Atom Stability :", validity_dict['atm_stable'])
+    print("Molecule Stability :", validity_dict['mol_stable'])
+
     if rdkit_tuple is not None:
         wandb.log({'Validity': rdkit_tuple[0][0], 'Uniqueness': rdkit_tuple[0][1], 'Novelty': rdkit_tuple[0][2],
                    'Connectivity': rdkit_tuple[0][3]})    

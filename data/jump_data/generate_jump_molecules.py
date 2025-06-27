@@ -2,12 +2,16 @@ import pandas as pd
 import numpy as np
 import tqdm 
 from collections import defaultdict
-
+import argparse
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import RDLogger
 
+parser = argparse.ArgumentParser(description="Generate molecular characteristics for JUMP dataset")
+parser.add_argument('--num_conformers', type=int, default=10,)
+parser.add_argument('--generate_with_h', action='store_true', help="Generate conformers with hydrogens")
+args = parser.parse_args()
 
 # Read the Parquet file
 metadata = pd.read_parquet('/projects/iktos/pierre/CondGeoLDM/data/jump_data/metadata.parquet')
@@ -27,23 +31,16 @@ metadata['Embeddings'] = embeddings_list
 # Disable RDKit warnings (we generate without hydrogens, and it makes it very grumpy)
 RDLogger.DisableLog('rdApp.warning')
 
-def get_positions_without_H(mol_with_h, conf_id):
-    conf = mol_with_h.GetConformer(conf_id)
-    pos = np.array([
-        [conf.GetAtomPosition(i).x, conf.GetAtomPosition(i).y, conf.GetAtomPosition(i).z]
-        for i, atom in enumerate(mol_with_h.GetAtoms())
-    if atom.GetSymbol() != 'H'
-    ])
-    
-    return pos
 
-
-def get_positions_without_H(mol_with_h, conf_id,):
+def get_positions(mol_with_h, conf_id,generate_with_h=False):
     conf = mol_with_h.GetConformer(conf_id)
     pos = conf.GetPositions()  # returns (N_atoms, 3) ndarray directly
-    symbols = [atom.GetSymbol() for atom in mol_with_h.GetAtoms()]
-    mask = np.array([s != 'H' for s in symbols])
-    return pos[mask]
+    if generate_with_h:
+        return pos
+    else: 
+        symbols = [atom.GetSymbol() for atom in mol_with_h.GetAtoms()]
+        mask = np.array([s != 'H' for s in symbols])
+        return pos[mask]
 
 
 def get_partial_charges(mol, valence_dict, i_mol):
@@ -79,7 +76,7 @@ def clean_valence_dict(valence_dict):
 
     
 # Generate molecular characteristics
-def get_molecular_characteristics(metadata, num_conformers=10):
+def get_molecular_characteristics(metadata, num_conformers=1, generate_with_h=False):
     """
     Generate molecular characteristics for 10 conformers of molecules in the JUMP dataset,
     including charges, 3D positions, atom types, and embeddings.
@@ -94,16 +91,16 @@ def get_molecular_characteristics(metadata, num_conformers=10):
     params.numThreads = 0
     
     for i_mol, mol_inchi in tqdm.tqdm(enumerate(molecular_ids)):
-        mol = Chem.MolFromInchi(mol_inchi, removeHs=False, sanitize=True)
+        mol_with_h = Chem.MolFromInchi(mol_inchi, removeHs=False, sanitize=True)  #Supposedly, its better to generate 3D coordinates with hydrogens
         valence_dict = defaultdict(lambda: defaultdict(set))
         
-        if mol is None:
+        if mol_with_h is None:
             bugged_ids_during_3d_generation.append(mol_inchi)
             print(f"Invalid molecular identifier: {dataset_internal_ids[i_mol]}")
             continue
         
         # Generate 3D coordinates
-        mol_with_h = Chem.AddHs(mol) # Supposedly, its better to generate 3D coordinates with hydrogens
+        mol_with_h = Chem.AddHs(mol_with_h) #
         confs_ids = AllChem.EmbedMultipleConfs(mol_with_h, numConfs=num_conformers, params=params)
         if len(confs_ids) == 0:
             bugged_ids_during_3d_generation.append(mol_inchi)
@@ -111,19 +108,24 @@ def get_molecular_characteristics(metadata, num_conformers=10):
             continue
         
         # Get positions without hydrogens
-        positions = [get_positions_without_H(mol_with_h, conf_id) for conf_id in confs_ids]
-        mol = Chem.RemoveHs(mol_with_h)  # Remove hydrogens after embedding
+        if generate_with_h:
+            positions = [get_positions(mol_with_h, conf_id, args.generate_with_h) for conf_id in confs_ids]
+        else:
+            # If we don't want hydrogens, we can remove them after embedding
+            positions = [get_positions(mol_with_h, conf_id, args.generate_with_h) for conf_id in confs_ids]
+            mol = Chem.RemoveHs(mol_with_h)  # Remove hydrogens after embedding
         
         # Get partial charges
-        charges = get_partial_charges(mol, valence_dict, i_mol)
+        charges = get_partial_charges(mol_with_h, valence_dict, i_mol) if generate_with_h else get_partial_charges(mol, valence_dict, i_mol)
         if charges == []:
             continue  # Skip if charges could not be computed
         
         # Get atom types
-        atom_types = np.array([atom.GetSymbol() for atom in mol.GetAtoms()])
+        atom_types = np.array([atom.GetSymbol() for atom in mol_with_h.GetAtoms()]) if generate_with_h else np.array([atom.GetSymbol() for atom in mol.GetAtoms()])
         
-        # Cutoff molecules bigger than 70 atoms
-        if len(charges) > 70:
+        # Cutoff molecules bigger than  atoms
+        cutoff = 120 if generate_with_h else 70
+        if len(charges) > cutoff:
             bugged_ids_during_3d_generation.append(mol_inchi)
             print(f"Too many atoms in {i_mol}, skipping.")
             continue
@@ -142,15 +144,21 @@ def get_molecular_characteristics(metadata, num_conformers=10):
     # Fill valence dictionnary
     valence_dict_clean = clean_valence_dict(valence_dict)
     
+    conformers_characteristics = sorted(conformers_characteristics, key=lambda x: len(x['charges']))
     return conformers_characteristics,  bugged_ids_during_3d_generation, valence_dict_clean
 
-charac, bugged_ids_during_3d_generation, allowed_bonds = get_molecular_characteristics(metadata)
+def main():
+    charac, bugged_ids_during_3d_generation, allowed_bonds = get_molecular_characteristics(metadata, 
+                                                                                           num_conformers=args.num_conformers, 
+                                                                                           generate_with_h=args.generate_with_h)
+    # Save charac to npy file
+    np.save(f"./charac_{args.num_conformers}{'_h' if args.generate_with_h else ''}.npy", charac, allow_pickle=True)
 
-
-
-# Save charac to npy file
-np.save("./charac.npy", charac, allow_pickle=True)
-
-# Save bugged_ids_during_3d_generation to npy file
-np.save("./bugged_ids_during_3d_generation.npy", np.array(bugged_ids_during_3d_generation), allow_pickle=True)
-np.save("./allowed_bonds.txt")
+    # Save bugged_ids_during_3d_generation to npy file
+    np.save(f"./bugged_ids_during_3d_generation_{args.num_conformers}{'_h' if args.generate_with_h else ''}.npy", np.array(bugged_ids_during_3d_generation), allow_pickle=True)
+    np.save(f"./allowed_bonds_{args.num_conformers}{'_h' if args.generate_with_h else ''}.txt", allowed_bonds, allow_pickle=True)
+    
+    
+if __name__ == "__main__":
+    print("Starting...'")
+    main()

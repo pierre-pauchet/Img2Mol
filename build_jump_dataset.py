@@ -5,60 +5,6 @@ from torch.utils.data import BatchSampler, DataLoader, Dataset, SequentialSample
 import argparse
 from qm9.data import collate as qm9_collate
 
-## TODO : adapt this scripti to the jump dataset
-
-# def extract_conformers(args):
-    # jump_file = os.path.join(args.data_dir, args.data_file)
-
-    # all_smiles = []
-    # all_number_atoms = []
-    # dataset_conformers = []
-    # mol_id = 0
-    # for i, drugs_1k in enumerate(unpacker):
-    #     print(f"Unpacking file {i}...")
-    #     for smiles, all_info in drugs_1k.items():
-    #         all_smiles.append(smiles)
-    #         conformers = all_info['conformers']
-    #         # Get the energy of each conformer. Keep only the lowest values
-    #         all_energies = []
-    #         for conformer in conformers:
-    #             all_energies.append(conformer['totalenergy'])
-    #         all_energies = np.array(all_energies)
-    #         argsort = np.argsort(all_energies)
-    #         lowest_energies = argsort[:args.conformations]
-    #         for id in lowest_energies:
-    #             conformer = conformers[id]
-    #             coords = np.array(conformer['xyz']).astype(float)        # n x 4
-    #             if args.remove_h:
-    #                 mask = coords[:, 0] != 1.0
-    #                 coords = coords[mask]
-    #             n = coords.shape[0]
-    #             all_number_atoms.append(n)
-    #             mol_id_arr = mol_id * np.ones((n, 1), dtype=float)
-    #             id_coords = np.hstack((mol_id_arr, coords))
-
-    #             dataset_conformers.append(id_coords)
-    #             mol_id += 1
-
-    # print("Total number of conformers saved", mol_id)
-    # all_number_atoms = np.array(all_number_atoms)
-    # dataset = np.vstack(dataset_conformers)
-
-    # print("Total number of atoms in the dataset", dataset.shape[0])
-    # print("Average number of atoms per molecule", dataset.shape[0] / mol_id)
-
-    # # Save conformations
-    # np.save(os.path.join(args.data_dir, save_file), dataset)
-    # # Save SMILES
-    # with open(os.path.join(args.data_dir, smiles_list_file), 'w') as f:
-    #     for s in all_smiles:
-    #         f.write(s)
-    #         f.write('\n')
-
-    # # Save number of atoms per conformation
-    # np.save(os.path.join(args.data_dir, number_atoms_file), all_number_atoms)
-    # print("Dataset processed.")
-
 
 def load_split_data(data_file='charac.npy', val_proportion=0.1, test_proportion=0.1, filter_size=None, seed=42):
     """Load and split data into train, validation and test sets.
@@ -179,7 +125,8 @@ def collate_fn(batch):
 
 
 class JumpDataLoader(DataLoader):
-    def __init__(self, sequential, dataset, batch_size, shuffle, drop_last=False, n_debug_samples=None):
+    def __init__(self, sequential, dataset, batch_size, shuffle, pin_memory=True, 
+                 drop_last=True, n_debug_samples=None, persistent_workers=True):
 
         if sequential:
             # This goes over the data sequentially, advantage is that it takes

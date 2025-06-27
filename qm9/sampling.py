@@ -56,9 +56,9 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
     elif args.dataset == 'geom' :
-        n_nodes = 44
+        n_nodes = 30
     elif args.dataset == 'jump':
-        n_nodes = 36
+        n_nodes = 30
     else:
         raise ValueError()
 
@@ -85,9 +85,22 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
     else: 
         phenotypes = None
         
-    node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
-    edge_mask = (1 - torch.eye(n_nodes)).unsqueeze(0)
-    edge_mask = edge_mask.repeat(n_samples, 1, 1).view(-1, 1).to(device)
+    # node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
+    # edge_mask = (1 - torch.eye(n_nodes)).unsqueeze(0)
+    # edge_mask = edge_mask.repeat(n_samples, 1, 1).view(-1, 1).to(device)
+    nodesxsample = [n_nodes - (i*5) for i in range(n_samples)]
+    nodesxsample = torch.tensor(nodesxsample)
+    node_mask = torch.zeros(n_samples, max(nodesxsample))
+    for i in range(n_samples):
+        node_mask[i, 0:nodesxsample[i]] = 1
+
+    # Compute edge_mask
+
+    edge_mask = node_mask.unsqueeze(1) * node_mask.unsqueeze(2)
+    diag_mask = ~torch.eye(edge_mask.size(1), dtype=torch.bool).unsqueeze(0)
+    edge_mask *= diag_mask
+    edge_mask = edge_mask.view(n_samples * max(nodesxsample) * max(nodesxsample), 1).to(device)
+    node_mask = node_mask.unsqueeze(2).to(device)
     keep_frames = min(40, args.n_stability_samples)
     if args.probabilistic_model == 'diffusion':
         one_hot, charges, x = None, None, None
@@ -113,7 +126,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
             one_hot = chain[:, :, :, 3:-1]
             one_hot = F.one_hot(torch.argmax(one_hot, dim=3), num_classes=len(dataset_info['atom_decoder']))
             charges = torch.round(chain[:, :, :, -1:]).long()
-
+            node_mask = node_mask.unsqueeze(1).repeat(1, chain.size(1), 1, 1).to(device)
             if mol_stable:
                 print('Found stable molecule to visualize :)')
                 break
@@ -123,7 +136,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
     else:
         raise ValueError
 
-    return one_hot, charges, x
+    return one_hot, charges, x, node_mask
 
 
 def sample(args, device, generative_model, dataset_info,
@@ -186,7 +199,6 @@ def sample(args, device, generative_model, dataset_info,
         raise ValueError(args.probabilistic_model)
 
     return one_hot, charges, x, node_mask
-
 
 def sample_sweep_conditional(args, device, generative_model, dataset_info, prop_dist, n_nodes=19, n_frames=100):
     nodesxsample = torch.tensor([n_nodes] * n_frames)

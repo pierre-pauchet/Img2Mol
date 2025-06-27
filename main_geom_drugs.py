@@ -1,6 +1,6 @@
 # Rdkit import should be first, do not move it
 import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'  # Set CUDA_VISIBLE_DEVICES to use GPU 1
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,3'  # Set CUDA_VISIBLE_DEVICES to use GPU 
 try:
     from rdkit import Chem
 except ModuleNotFoundError:

@@ -233,19 +233,19 @@ def check_stability(positions, atom_type, dataset_info, debug=False):
                     (atom_decoder[pair[0]], atom_decoder[pair[1]]), dist)
             nr_bonds[i] += order
             nr_bonds[j] += order
-    nr_stable_bonds = 0
+    nr_stable_atoms = 0
     for atom_type_i, nr_bonds_i in zip(atom_type, nr_bonds):
         possible_bonds = bond_analyze.allowed_bonds[atom_decoder[atom_type_i]]
         if type(possible_bonds) is int:
-            is_stable = possible_bonds == nr_bonds_i
+            is_stable = possible_bonds <= nr_bonds_i
         else:
             is_stable = nr_bonds_i in possible_bonds
         if not is_stable and debug:
             print("Invalid bonds for molecule %s with %d bonds" % (atom_decoder[atom_type_i], nr_bonds_i))
-        nr_stable_bonds += int(is_stable)
+        nr_stable_atoms += int(is_stable)
 
-    molecule_stable = nr_stable_bonds == len(x)
-    return molecule_stable, nr_stable_bonds, len(x)
+    molecule_stable = nr_stable_atoms == len(x)
+    return molecule_stable, nr_stable_atoms, len(x)
 
 
 def process_loader(dataloader):
@@ -337,7 +337,7 @@ def analyze_stability_for_molecules(molecule_list, dataset_info):
     n_samples = len(x)
 
     molecule_stable = 0
-    nr_stable_bonds = 0
+    nr_stable_atoms = 0
     n_atoms = 0
 
     processed_list = []
@@ -355,12 +355,12 @@ def analyze_stability_for_molecules(molecule_list, dataset_info):
         validity_results = check_stability(pos, atom_type, dataset_info)
 
         molecule_stable += int(validity_results[0])
-        nr_stable_bonds += int(validity_results[1])
+        nr_stable_atoms += int(validity_results[1])
         n_atoms += int(validity_results[2])
 
     # Validity
     fraction_mol_stable = molecule_stable / float(n_samples)
-    fraction_atm_stable = nr_stable_bonds / float(n_atoms)
+    fraction_atm_stable = nr_stable_atoms / float(n_atoms)
     validity_dict = {
         'mol_stable': fraction_mol_stable,
         'atm_stable': fraction_atm_stable,

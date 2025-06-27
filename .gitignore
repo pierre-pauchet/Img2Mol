@@ -43,3 +43,6 @@ position_stats_Geom Dataset.png
 *.npy
 similarity_matrix.png
 best_hits_histogram.png
+best_hits_histogram_cross.png
+best_hits_histogram_jump.png
+best_hits_histogram_geom.png

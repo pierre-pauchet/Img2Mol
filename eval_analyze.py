@@ -5,13 +5,16 @@ except ModuleNotFoundError:
     pass
 import utils
 import argparse
+
 from qm9 import dataset
 from qm9.models import get_model, get_autoencoder, get_latent_diffusion
 import os
+# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from equivariant_diffusion.utils import assert_mean_zero_with_mask, remove_mean_with_mask,\
     assert_correctly_masked
 import torch
 import time
+import tqdm
 import pickle
 from configs.datasets_config import get_dataset_info
 from os.path import join
@@ -34,12 +37,12 @@ def check_mask_correct(variables, node_mask):
 
 def analyze_and_save(args, eval_args, device, generative_model,
                      nodes_dist, prop_dist, dataset_info, n_samples=10,
-                     batch_size=10, save_to_xyz=False):
+                     batch_size=100, save_to_xyz=False):
     batch_size = min(batch_size, n_samples)
     assert n_samples % batch_size == 0
     molecules = {'one_hot': [], 'x': [], 'node_mask': []}
     start_time = time.time()
-    for i in range(int(n_samples/batch_size)):
+    for i in tqdm.tqdm(range(int(n_samples/batch_size))):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(
             args, device, generative_model, dataset_info, prop_dist=prop_dist, nodesxsample=nodesxsample)
@@ -48,10 +51,10 @@ def analyze_and_save(args, eval_args, device, generative_model,
         molecules['x'].append(x.detach().cpu())
         molecules['node_mask'].append(node_mask.detach().cpu())
 
-        current_num_samples = (i+1) * batch_size
-        secs_per_sample = (time.time() - start_time) / current_num_samples
-        print('\t %d/%d Molecules generated at %.2f secs/sample' % (
-            current_num_samples, n_samples, secs_per_sample))
+        # current_num_samples = (i+1) * batch_size
+        # secs_per_sample = (time.time() - start_time) / current_num_samples
+        # print('\t %d/%d Molecules generated at %.4f secs/sample' % (
+        #     current_num_samples, n_samples, secs_per_sample))
 
         if save_to_xyz:
             id_from = i * batch_size
@@ -111,7 +114,7 @@ def test(args, flow_dp, nodes_dist, device, dtype, loader, partition='Test', num
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default="outputs/edm_1",
+    parser.add_argument('--model_path', type=str, default="outputs/edm_1    ",
                         help='Specify model path')
     parser.add_argument('--n_samples', type=int, default=100,
                         help='Specify model path')
@@ -119,6 +122,7 @@ def main():
                         help='Specify model path')
     parser.add_argument('--save_to_xyz', type=eval, default=False,
                         help='Should save samples to xyz files.')
+    parser.add_argument('--conditioning_mode', type=str, default='original',)
 
     eval_args, unparsed_args = parser.parse_known_args()
 
@@ -132,6 +136,9 @@ def main():
         args.normalization_factor = 1
     if not hasattr(args, 'aggregation_method'):
         args.aggregation_method = 'sum'
+    if not hasattr(args, 'conditioning_mode'):
+        args.conditioning_mode = 'original'
+        
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if args.cuda else "cpu")

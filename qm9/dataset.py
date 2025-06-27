@@ -38,7 +38,7 @@ def retrieve_dataloaders(cfg):
     elif 'jump' in cfg.dataset:
         import build_jump_dataset       
         from configs.datasets_config import get_dataset_info
-        data_file = '/projects/iktos/pierre/CondGeoLDM/charac.npy'
+        data_file = '/projects/iktos/pierre/CondGeoLDM/charac_10_no_h.npy'
         batch_size = cfg.batch_size
         batch_size = cfg.batch_size
         num_workers = cfg.num_workers
@@ -65,6 +65,7 @@ def retrieve_dataloaders(cfg):
             dataloaders[key] = build_jump_dataset.JumpDataLoader(
             sequential=cfg.sequential, dataset=dataset, batch_size=cfg.batch_size,
             shuffle=shuffle)
+            
         del split_data
         charge_scale = None
         
