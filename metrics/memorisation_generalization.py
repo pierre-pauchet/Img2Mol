@@ -1,12 +1,23 @@
 import rdkit
 from rdkit import Chem
+from skfp.fingerprints import AtomPairFingerprint
+
 import numpy as np
 import os
 from skfp.distances.tanimoto import bulk_tanimoto_binary_similarity
 import matplotlib.pyplot as plt
 import argparse
 import tqdm
+from qm9.rdkit_functions import smiles_to_mols, build_molecule, build_xae_molecule
 
+
+def mols_to_fingerprints(mols_list, fp_size=1024, radius=2):
+    atom_pair_fingerprint = AtomPairFingerprint(fp_size)
+    
+    fingerprints = atom_pair_fingerprint.transform(mols_list)
+    return fingerprints
+    
+    
 def compute_retrieval(fingerprints, train_fingerprints, threshold=0.8):
     """
     Compute retrieval metrics based on Tanimoto distances.
