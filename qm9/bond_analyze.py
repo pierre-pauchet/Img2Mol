@@ -97,12 +97,32 @@ def check_consistency_bond_dictionaries():
 stdv = {'H': 5, 'C': 1, 'N': 1, 'O': 2, 'F': 3}
 margin1, margin2, margin3 = 10, 5, 3
 
-allowed_bonds = {'H': 1, 'C': 4, 'N': 3, 'O': 2, 'F': 1, 'B': 3, 'Al': 3,
+ALLOWED_VALENCIES = {
+    "H": {0: 1, 1: 0, -1: 0},
+    "C": {0: [3, 4], 1: 3, -1: 3},
+    "N": {0: [2, 3], 1: [2, 3, 4], -1: 2},  # In QM9, N+ seems to be present in the form NH+ and NH2+
+    "O": {0: 2, 1: 3, -1: 1},
+    "F": {0: 1, -1: 0},
+    "B": 3,
+    "Al": 3,
+    "Si": 4,
+    "P": {0: [3, 5], 1: 4},
+    "S": {0: [2, 6], 1: [2, 3], 2: 4, 3: 5, -1: 3},
+    "Cl": 1,
+    "As": 3,
+    "Br": {0: 1, 1: 2},
+    "I": 1,
+    "Hg": [1, 2],
+    "Bi": [3, 5],
+    "Se": [2, 4, 6],
+}
+
+ALLOWED_BONDS = {'H': 1, 'C': 4, 'N': 3, 'O': 2, 'F': 1, 'B': 3, 'Al': 3,
                  'Si': 4, 'P': [3, 5],
                  'S': 6, 'Cl': 1, 'As': 3, 'Br': 1, 'I': 1, 'Hg': [1, 2],
                  'Bi': [3, 5], 'Se':[4,6], 'Sn':[2,4], 'Na':1, 'K':1, 'Mo':3, 'V':[2,3,4,5],
                  }
-
+allowed_bonds = ALLOWED_BONDS
 
 def get_bond_order(atom1, atom2, distance, check_exists=False):
     distance = 100 * distance  # We change the metric

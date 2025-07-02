@@ -7,7 +7,7 @@ try:
     use_rdkit = True
 except ModuleNotFoundError:
     use_rdkit = False
-import qm9 as dataset
+import qm9.dataset as dataset
 import torch
 import matplotlib
 matplotlib.use('Agg')
@@ -165,7 +165,7 @@ def main_analyze_qm9(remove_h: bool, dataset_name='qm9', n_atoms=None):
             self.num_workers = 0
             self.include_charges = True
             self.dataset = dataset_name  #could be qm9, qm9_first_half or qm9_second_half
-            self.datadir = 'qm9/temp'
+            self.datadir = './qm9/temp'
 
     cfg = DataLoaderConfig()
 
@@ -237,7 +237,7 @@ def check_stability(positions, atom_type, dataset_info, debug=False):
     for atom_type_i, nr_bonds_i in zip(atom_type, nr_bonds):
         possible_bonds = bond_analyze.allowed_bonds[atom_decoder[atom_type_i]]
         if type(possible_bonds) is int:
-            is_stable = possible_bonds <= nr_bonds_i
+            is_stable = possible_bonds == nr_bonds_i
         else:
             is_stable = nr_bonds_i in possible_bonds
         if not is_stable and debug:
@@ -393,6 +393,6 @@ def analyze_node_distribution(mol_list, save_path):
 
 if __name__ == '__main__':
 
-    # main_analyze_qm9(remove_h=False, dataset_name='qm9')
+    main_analyze_qm9(remove_h=False, dataset_name='qm9')
     main_check_stability(remove_h=False)
 

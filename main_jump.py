@@ -3,7 +3,7 @@
 
 # Rdkit import should be first, do not move it
 import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # Set CUDA_VISIBLE_DEVICES to use GPU 0
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'  # Set CUDA_VISIBLE_DEVICES to use GPU 0
 
 try:
     from rdkit import Chem
@@ -27,6 +27,7 @@ import time
 import pickle
 from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings
 from train_test import train_epoch, test, analyze_and_save
+
 
 parser = argparse.ArgumentParser(description='E3Diffusion')
 parser.add_argument('--exp_name', type=str, default='')
@@ -137,37 +138,19 @@ parser.add_argument('--aggregation_method', type=str, default='sum',
                     help='"sum" or "mean"')
 # Mine
 parser.add_argument('--data_augmentation', type=eval, default=False, help='use attention in the EGNN')
-parser.add_argument('--embeddings_data_dir', type=str, default='CondGeoLDM/data/jump_data')
 parser.add_argument("--conditioning", nargs='+', default=[],
                     help='arguments : homo | lumo | alpha | gap | mu | Cv' )
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other') #maybe i should default to a no cond mode
-parser.add_argument('--data_file', type=str, default='/projects/iktos/pierre/CondGeoLDM/charac_new.npy')
+parser.add_argument('--data_file', type=str, default='/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy')
 parser.add_argument('--filter_molecule_size', type=int, default=None)
 parser.add_argument('--sequential', type=bool, default=False)
-parser.add_argument('--percent_train_ds', type=int, default=None,
+parser.add_argument('--percent_train_ds', type=float, default=None,
                     help='number of molecules used in train.')
 parser.add_argument('--viability_metrics_epochs', type=int, default=None,
                     help='Frequence of computation of metrics. Defaults to test_epochs')
 
 args = parser.parse_args()
-print(args)
-
-dataset_info = get_dataset_info(args.dataset, args.remove_h)
-
-atom_encoder = dataset_info['atom_encoder']
-atom_decoder = dataset_info['atom_decoder']
-
-# args, unparsed_args = parser.parse_known_args()
-args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
-args.cuda = not args.no_cuda and torch.cuda.is_available()
-device = torch.device("cuda" if args.cuda else "cpu")
-args.device = device
-
-if args.viability_metrics_epochs is None:
-    args.viability_metrics_epochs = args.test_epochs
-
-dtype = torch.float32
 
 if args.resume is not None:
     exp_name = args.exp_name + '_resume'
@@ -193,7 +176,24 @@ if args.resume is not None:
     if not hasattr(args, 'aggregation_method'):
         args.aggregation_method = aggregation_method
 
-    print(args)
+
+dataset_info = get_dataset_info(args.dataset, args.remove_h)
+
+atom_encoder = dataset_info['atom_encoder']
+atom_decoder = dataset_info['atom_decoder']
+
+# args, unparsed_args = parser.parse_known_args()
+args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
+args.cuda = not args.no_cuda and torch.cuda.is_available()
+device = torch.device("cuda" if args.cuda else "cpu")
+args.device = device
+
+if args.viability_metrics_epochs is None:
+    args.viability_metrics_epochs = args.test_epochs
+
+dtype = torch.float32
+
+
 
 utils.create_folders(args)
 
@@ -222,12 +222,10 @@ if len(args.conditioning) == 0:
     property_norms = None
 else:
     if args.conditioning_mode =='original': # OG Physics conditoning
-        print(f'Conditioning with {args.conditioning_mode}')
         property_norms = compute_mean_mad(dataloaders, args.conditioning, args.dataset)
         context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
         context_node_nf = context_dummy.size(2)
     elif args.conditioning_mode == 'naive': # Naive conditioning
-        print(f'Conditioning on {args.conditioning_mode}')
         property_norms = compute_mean_mad(dataloaders, args.conditioning, args.dataset)
         context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
         embeddings = prepare_embeddings(data_dummy, verbose=True)
@@ -279,7 +277,6 @@ def main():
 
     # Initialize dataparallel if enabled and possible.
     if args.dp and torch.cuda.device_count() > 1:
-        print(args.dp)
         print(f'Training using {torch.cuda.device_count()} GPUs')
         model_dp = torch.nn.DataParallel(model.cpu())
         model_dp = model_dp.cuda()
@@ -301,7 +298,7 @@ def main():
         model_ema_dp = model_dp
 
     best_nll_val = 1e10
-    best_nll_test = 1e1
+    # best_nll_test = 1e1
     test_loaders = dataloaders['test']
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
@@ -318,9 +315,7 @@ def main():
                                  dataset_info=dataset_info, device=device,
                                  prop_dist=prop_dist, n_samples=args.n_stability_samples,
                                  test_loaders=test_loaders)
-                nll_test = test(args=args, loader=dataloaders['test'], epoch=epoch, eval_model=model_ema_dp,
-                partition='Test', device=device, dtype=dtype,
-                nodes_dist=nodes_dist, property_norms=property_norms)
+
             nll_val = test(args=args, loader=dataloaders['valid'], epoch=epoch, eval_model=model_ema_dp,
                            partition='Val', device=device, dtype=dtype, nodes_dist=nodes_dist,
                            property_norms=property_norms)
@@ -328,7 +323,7 @@ def main():
 
             if nll_val < best_nll_val or epoch ==0:
                 best_nll_val = nll_val
-                best_nll_test = nll_test
+                # best_nll_test = nll_test
                 
                 #save best model over previous best
                 if args.save_model:
@@ -348,11 +343,17 @@ def main():
             #         utils.save_model(model_ema, 'outputs/%s/generative_model_ema_%d.npy' % (args.exp_name, epoch))
             #     with open('outputs/%s/args_%d.pickle' % (args.exp_name, epoch), 'wb') as f:
             #         pickle.dump(args, f)
-            print('Val loss: %.4f \t Test loss:  %.4f' % (nll_val, nll_test))
-            print('Best val loss: %.4f \t Best test loss:  %.4f' % (best_nll_val, best_nll_test))
+            print('Val loss: %.4f' % (nll_val))
+            print('Best val loss: %.4f' % best_nll_val)
             wandb.log({"Val loss ": nll_val, "Epoch":epoch}, commit=True)
-            wandb.log({"Test loss ": nll_test, "Epoch":epoch}, commit=True)
-            wandb.log({"Best cross-validated test loss ": best_nll_test, "Epoch":epoch}, commit=True)
+            # wandb.log({"Best cross-validated test loss ": best_nll_test, "Epoch":epoch}, commit=True)
+            
+        nll_test = test(args=args, loader=dataloaders['test'], epoch=epoch, eval_model=model_ema_dp,
+        partition='Test', device=device, dtype=dtype,
+        nodes_dist=nodes_dist, property_norms=property_norms)
+        print('Test loss:  %.4f' % nll_test)
+        wandb.log({"Test loss ": nll_test, "Epoch":epoch}, commit=True)
+        
 
 
 if __name__ == "__main__":

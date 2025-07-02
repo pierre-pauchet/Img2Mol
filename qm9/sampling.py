@@ -51,14 +51,16 @@ def reverse_tensor(x):
     return x[torch.arange(x.size(0) - 1, -1, -1)]
 
 
-def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test_loaders=None, random_idx=False):
-    n_samples = 4
+def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, 
+                 test_loaders=None, random_idx=False, n_samples=4):
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
     elif args.dataset == 'geom' :
         n_nodes = 30
-    elif args.dataset == 'jump':
+    elif args.dataset == 'jump' and args.remove_h:
         n_nodes = 30
+    elif args.dataset == 'jump' and not args.remove_h:
+        n_nodes = 44
     else:
         raise ValueError()
 
@@ -106,6 +108,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
         one_hot, charges, x = None, None, None
         for i in range(n_tries):
             chain = flow.sample_chain(n_samples, n_nodes, node_mask, edge_mask, context, phenotypes, keep_frames=keep_frames)
+
             # chain = chains[:chains.size(0) //n_samples] # take only the first chain
             chain = reverse_tensor(chain)
         
@@ -126,7 +129,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
             one_hot = chain[:, :, :, 3:-1]
             one_hot = F.one_hot(torch.argmax(one_hot, dim=3), num_classes=len(dataset_info['atom_decoder']))
             charges = torch.round(chain[:, :, :, -1:]).long()
-            node_mask = node_mask.unsqueeze(1).repeat(1, chain.size(1), 1, 1).to(device)
+            node_mask_final = node_mask.unsqueeze(1).repeat(1, chain.size(1), 1, 1).to(device)
             if mol_stable:
                 print('Found stable molecule to visualize :)')
                 break
@@ -136,7 +139,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, test
     else:
         raise ValueError
 
-    return one_hot, charges, x, node_mask
+    return one_hot, charges, x, node_mask_final
 
 
 def sample(args, device, generative_model, dataset_info,

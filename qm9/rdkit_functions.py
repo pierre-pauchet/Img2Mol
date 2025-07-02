@@ -116,7 +116,7 @@ class BasicMolecularMetrics(object):
             smiles = mol2smiles(mol)
             if smiles is not None:
                 mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True)
-                if len(mol_frags) == 0:
+                if len(mol_frags) == 1:
                     connected.append(True)
                 largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
                 smiles = mol2smiles(largest_mol)

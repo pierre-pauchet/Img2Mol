@@ -51,7 +51,7 @@ class JumpDataset(Dataset):
         self.transform = transform
         if percent_train_ds is not None:
             assert 0 < percent_train_ds <= 100, "percent_train_ds must be between 0 and 100"
-            end_index = len(data_list)*percent_train_ds //100
+            end_index = round(len(data_list)*percent_train_ds //100)
             data_list = data_list[:end_index]
         # Sort the data list by size
         lengths = [len(mol["atom_types"]) for mol in data_list]

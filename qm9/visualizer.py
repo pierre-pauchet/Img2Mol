@@ -300,7 +300,6 @@ def visualize_chain(path, dataset_info, wandb=None, spheres_3d=False,
     for n in range(1, 5):
         if n * n >= n_samples:
             cols = n
-            print('cols', cols)
             break
     rows = cols
     

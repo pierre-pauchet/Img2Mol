@@ -31,20 +31,36 @@ def save_and_sample_chain(args, eval_args, device, flow,
                           n_tries, n_nodes, dataset_info, sample_id=0,
                           num_chains=10):
 
-    for i in range(num_chains):
-        target_path = f'eval/chain_{i}/'
+    target_path = ('eval/chain/')
 
-        one_hot, charges, x = sample_chain(
-            args, device, flow, n_tries, dataset_info)
+    one_hot, charges, x, node_mask = sample_chain(
+        args, device, flow, n_tries, dataset_info, test_loaders=None)
+    for sample_id in range(one_hot.size(0)):
+        vis.save_xyz_file(join(eval_args.model_path, f'{target_path}'),
+                    one_hot[sample_id], charges[sample_id], x[sample_id], dataset_info,
+                    sample_id, name='chain', node_mask=node_mask[sample_id]
+                )
 
-        vis.save_xyz_file(
-            join(eval_args.model_path, target_path), one_hot, charges, x,
-            dataset_info, sample_id, name='chain')
-
-        vis.visualize_chain_uncertainty(
-            join(eval_args.model_path, target_path), dataset_info,
+    # Check that the mask is correct
+    vis.visualize_chain(
+            join(eval_args.model_path, f'{target_path}'), dataset_info,
             spheres_3d=True)
+        
+    #Legacy code : 
+    
+    # for i in range(num_chains):
+    #     target_path = f'eval/chain_{i}/'
 
+    #     one_hot, charges, x = sample_chain(
+    #         args, device, flow, n_tries, dataset_info)
+
+    #     vis.save_xyz_file(
+    #         join(eval_args.model_path, target_path), one_hot, charges, x,
+    #         dataset_info, sample_id, name='chain')
+
+    #     vis.visualize_chain_uncertainty(
+    #         join(eval_args.model_path, target_path), dataset_info,
+    #         spheres_3d=True)
     return one_hot, charges, x
 
 
@@ -104,7 +120,7 @@ def main():
     parser.add_argument(
         '--n_tries', type=int, default=10,
         help='N tries to find stable molecule for gif animation')
-    parser.add_argument('--n_nodes', type=int, default=36,
+    parser.add_argument('--n_nodes', type=int, default=44,
                         help='number of atoms in molecule for gif animation')
 
     eval_args, unparsed_args = parser.parse_known_args()
@@ -142,7 +158,7 @@ def main():
                                  map_location=device)
 
     flow.load_state_dict(flow_state_dict)
-
+    
     print('Sampling handful of molecules.')
     sample_different_sizes_and_save(
         args, eval_args, device, flow, nodes_dist,
@@ -152,6 +168,7 @@ def main():
     sample_only_stable_different_sizes_and_save(
         args, eval_args, device, flow, nodes_dist,
         dataset_info=dataset_info, n_samples=10, n_tries=2*10)
+    
     print('Visualizing molecules.')
     vis.visualize(
         join(eval_args.model_path, 'eval/molecules/'), dataset_info,

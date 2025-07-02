@@ -1,9 +1,6 @@
 *__pycache__*
 *.pyc
-data/geom/*
-.idea*
 bash.sh
-kohler/cache/*
 !data/geom/README.md
 *.log
 *wandb*
@@ -16,27 +13,17 @@ outputs/*
 bash_dw4.sh
 bash_qm9pos.sh
 bash_qm9_analyze.sh
-beautiful_figures/ovito_images/*
-*toy/samples/*
-*toy/loss_components/*
 qm9.sh
-build/
 dist/
-EN_diffusion.egg-info/
-*/sidechainnet_data/*
-*example.pdb
 qm9/property_prediction/outputs/*
 qm9_conditional.sh
 figures/
 geom_drugs.sh
 wget-log
-charac.npy
 pyproject.toml
 bugged_ids_during_3d_generation.npy
 requirements.txt
-data/jump_data/metadata.parquet
-data/jump_data/metadata.parquet
-data/jump_data/Embeddings_norm.npy
+data/jump/Embeddings_norm.npy
 python3.9/*
 position_stats_Jump Dataset.png
 position_stats_Geom Dataset.png
@@ -46,3 +33,5 @@ best_hits_histogram.png
 best_hits_histogram_cross.png
 best_hits_histogram_jump.png
 best_hits_histogram_geom.png
+data/jump/raw_data/metadata.parquet
+data/*

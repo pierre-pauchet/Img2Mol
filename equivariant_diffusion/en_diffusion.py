@@ -805,6 +805,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         """
         Draw samples from the generative model, keep the intermediate states for visualization purposes.
         """
+        
         z = self.sample_combined_position_feature_noise(n_samples, n_nodes, node_mask)
 
         diffusion_utils.assert_mean_zero_with_mask(z[:, :, :self.n_dims], node_mask)
