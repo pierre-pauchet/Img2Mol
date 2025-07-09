@@ -78,11 +78,13 @@ def test(args, flow_dp, nodes_dist, device, dtype, loader, partition='Test', num
         with torch.no_grad():
             for i, data in enumerate(loader):
                 # Get data
-                x = data['positions'].to(device, dtype)
-                node_mask = data['atom_mask'].to(device, dtype).unsqueeze(2)
-                edge_mask = data['edge_mask'].to(device, dtype)
-                one_hot = data['one_hot'].to(device, dtype)
-                charges = (data['charges'] if args.include_charges else torch.zeros(0)).to(device, dtype)
+                x = data["positions"].to(device, dtype)
+                node_mask = data["atom_mask"].to(device, dtype).unsqueeze(2)
+                edge_mask = data["edge_mask"].to(device, dtype)
+                one_hot = data["one_hot"].to(device, dtype)
+                charges = (
+                    data["charges"] if args.include_charges else torch.zeros(0)
+                ).to(device, dtype)
 
                 batch_size = x.size(0)
 
@@ -90,7 +92,7 @@ def test(args, flow_dp, nodes_dist, device, dtype, loader, partition='Test', num
                 check_mask_correct([x, one_hot], node_mask)
                 assert_mean_zero_with_mask(x, node_mask)
 
-                h = {'categorical': one_hot, 'integer': charges}
+                h = {"categorical": one_hot, "integer": charges}
 
                 if len(args.conditioning) > 0:
                     context = prepare_context(args.conditioning, data).to(device, dtype)
@@ -99,8 +101,9 @@ def test(args, flow_dp, nodes_dist, device, dtype, loader, partition='Test', num
                     context = None
 
                 # transform batch through flow
-                nll, _, _ = losses.compute_loss_and_nll(args, flow_dp, nodes_dist, x, h, node_mask,
-                                                        edge_mask, context)
+                nll, _, _ = losses.compute_loss_and_nll(
+                    args, flow_dp, nodes_dist, x, h, node_mask, edge_mask, context
+                )
                 # standard nll from forward KL
 
                 nll_epoch += nll.item() * batch_size
@@ -128,17 +131,16 @@ def main():
 
     assert eval_args.model_path is not None
 
-    with open(join(eval_args.model_path, 'args.pickle'), 'rb') as f:
+    with open(join(eval_args.model_path, "args.pickle"), "rb") as f:
         args = pickle.load(f)
 
     # CAREFUL with this -->
-    if not hasattr(args, 'normalization_factor'):
+    if not hasattr(args, "normalization_factor"):
         args.normalization_factor = 1
-    if not hasattr(args, 'aggregation_method'):
-        args.aggregation_method = 'sum'
-    if not hasattr(args, 'conditioning_mode'):
-        args.conditioning_mode = 'original'
-        
+    if not hasattr(args, "aggregation_method"):
+        args.aggregation_method = "sum"
+    if not hasattr(args, "conditioning_mode"):
+        args.conditioning_mode = "original"
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -181,7 +183,7 @@ def main():
         val_name = 'val'
         num_passes = 1
     else:
-        val_name = 'valid'
+        val_name = "valid"
         num_passes = 5
 
     # Evaluate negative log-likelihood for the validation and test partitions

@@ -1,9 +1,10 @@
-# TODO : ajouter gestion des devices,pour cibler ls GPU du cluster 
+# TODO : ajouter gestion des devices,pour cibler ls GPU du cluster
 # idee : checker tous les assignements de device et les remplacer par un device unique, défini en dessous des argsparser
 
 # Rdkit import should be first, do not move it
 import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'  # Set CUDA_VISIBLE_DEVICES to use GPU 0
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # Set CUDA_VISIBLE_DEVICES to use GPU 0
 
 try:
     from rdkit import Chem
@@ -24,8 +25,9 @@ from equivariant_diffusion.utils import assert_correctly_masked
 from equivariant_diffusion import utils as flow_utils
 import torch
 import time
+import torchinfo
 import pickle
-from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings
+from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings, profiler
 from train_test import train_epoch, test, analyze_and_save
 
 
@@ -153,14 +155,14 @@ parser.add_argument('--viability_metrics_epochs', type=int, default=None,
 args = parser.parse_args()
 
 if args.resume is not None:
-    exp_name = args.exp_name + '_resume'
+    exp_name = args.exp_name + "_resume"
     start_epoch = args.start_epoch
     resume = args.resume
     wandb_usr = args.wandb_usr
     normalization_factor = args.normalization_factor
     aggregation_method = args.aggregation_method
 
-    with open(join(args.resume, 'args.pickle'), 'rb') as f:
+    with open(join(args.resume, "args.pickle"), "rb") as f:
         args = pickle.load(f)
 
     args.resume = resume
@@ -171,16 +173,16 @@ if args.resume is not None:
     args.wandb_usr = wandb_usr
 
     # Careful with this -->
-    if not hasattr(args, 'normalization_factor'):
+    if not hasattr(args, "normalization_factor"):
         args.normalization_factor = normalization_factor
-    if not hasattr(args, 'aggregation_method'):
+    if not hasattr(args, "aggregation_method"):
         args.aggregation_method = aggregation_method
 
 
 dataset_info = get_dataset_info(args.dataset, args.remove_h)
 
-atom_encoder = dataset_info['atom_encoder']
-atom_decoder = dataset_info['atom_decoder']
+atom_encoder = dataset_info["atom_encoder"]
+atom_decoder = dataset_info["atom_decoder"]
 
 # args, unparsed_args = parser.parse_known_args()
 args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
@@ -199,33 +201,33 @@ utils.create_folders(args)
 
 # Wandb config
 if args.no_wandb:
-    mode = 'disabled'
+    mode = "disabled"
 else:
     mode = 'online' if args.online else 'offline'
 kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion', 'config': vars(args),
           'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': mode}
 wandb.init(**kwargs)
-wandb.save('*.txt')
+wandb.save("*.txt")
 
 
 # Build Jump Dataset
 dataloaders, charge_scale = dataset.retrieve_dataloaders(args)
 
-atom_encoder = dataset_info['atom_encoder']
-atom_decoder = dataset_info['atom_decoder']
+atom_encoder = dataset_info["atom_encoder"]
+atom_decoder = dataset_info["atom_decoder"]
 
-data_dummy = next(iter(dataloaders['train']))
+data_dummy = next(iter(dataloaders["train"]))
 
 # Conditioning
 if len(args.conditioning) == 0:
     context_node_nf = 0
     property_norms = None
 else:
-    if args.conditioning_mode =='original': # OG Physics conditoning
+    if args.conditioning_mode == "original":  # OG Physics conditoning
         property_norms = compute_mean_mad(dataloaders, args.conditioning, args.dataset)
         context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
         context_node_nf = context_dummy.size(2)
-    elif args.conditioning_mode == 'naive': # Naive conditioning
+    elif args.conditioning_mode == "naive":  # Naive conditioning
         property_norms = compute_mean_mad(dataloaders, args.conditioning, args.dataset)
         context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
         embeddings = prepare_embeddings(data_dummy, verbose=True)
@@ -246,7 +248,9 @@ args.context_node_nf = context_node_nf
 # Create Latent Diffusion Model or Audoencoder
 
 if args.train_diffusion:
-    model, nodes_dist, prop_dist = get_latent_diffusion(args, device, dataset_info, dataloaders['train'])
+    model, nodes_dist, prop_dist = get_latent_diffusion(
+        args, device, dataset_info, dataloaders["train"]
+    )
 else:
     model, nodes_dist, prop_dist = get_autoencoder(args, device, dataset_info, dataloaders['train'])
 
@@ -260,7 +264,6 @@ gradnorm_queue = utils.Queue()
 gradnorm_queue.add(3000)  # Add large value that will be flushed.
 
 
-
 def check_mask_correct(variables, node_mask):
     for variable in variables:
         if len(variable) > 0:
@@ -270,14 +273,14 @@ def check_mask_correct(variables, node_mask):
 def main():
     print(args)
     if args.resume is not None:
-        flow_state_dict = torch.load(join(args.resume, 'generative_model_ema.npy'))
-        optim_state_dict = torch.load(join(args.resume, 'flow.npy'))
+        flow_state_dict = torch.load(join(args.resume, "generative_model_ema.npy"))
+        optim_state_dict = torch.load(join(args.resume, "flow.npy"))
         model.load_state_dict(flow_state_dict)
         optim.load_state_dict(optim_state_dict)
 
     # Initialize dataparallel if enabled and possible.
     if args.dp and torch.cuda.device_count() > 1:
-        print(f'Training using {torch.cuda.device_count()} GPUs')
+        print(f"Training using {torch.cuda.device_count()} GPUs")
         model_dp = torch.nn.DataParallel(model.cpu())
         model_dp = model_dp.cuda()
     else:
@@ -321,11 +324,11 @@ def main():
                            property_norms=property_norms)
 
 
-            if nll_val < best_nll_val or epoch ==0:
+            if nll_val < best_nll_val or epoch == 0:
                 best_nll_val = nll_val
                 # best_nll_test = nll_test
-                
-                #save best model over previous best
+
+                # save best model over previous best
                 if args.save_model:
                     args.current_epoch = epoch + 1
                     utils.save_model(optim, 'outputs/%s/flow.npy' % args.exp_name)
@@ -343,9 +346,9 @@ def main():
             #         utils.save_model(model_ema, 'outputs/%s/generative_model_ema_%d.npy' % (args.exp_name, epoch))
             #     with open('outputs/%s/args_%d.pickle' % (args.exp_name, epoch), 'wb') as f:
             #         pickle.dump(args, f)
-            print('Val loss: %.4f' % (nll_val))
-            print('Best val loss: %.4f' % best_nll_val)
-            wandb.log({"Val loss ": nll_val, "Epoch":epoch}, commit=True)
+            print("Val loss: %.4f" % (nll_val))
+            print("Best val loss: %.4f" % best_nll_val)
+            wandb.log({"Val loss ": nll_val, "Epoch": epoch}, commit=True)
             # wandb.log({"Best cross-validated test loss ": best_nll_test, "Epoch":epoch}, commit=True)
             
         nll_test = test(args=args, loader=dataloaders['test'], epoch=epoch, eval_model=model_ema_dp,

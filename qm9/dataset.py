@@ -100,9 +100,11 @@ def retrieve_dataloaders(cfg):
             dataloaders[key] = build_geom_dataset.GeomDrugsDataLoader(
                 sequential=cfg.sequential, dataset=dataset,
                 batch_size=cfg.batch_size,
-                shuffle=shuffle)
+                shuffle=shuffle,
+                num_workers=cfg.num_workers,)
         del split_data
-        charge_scale = None
+        charge_scale = None,
+        
     else:
         raise ValueError(f'Unknown dataset {cfg.dataset}')
 

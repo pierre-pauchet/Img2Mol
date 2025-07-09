@@ -35,3 +35,4 @@ best_hits_histogram_jump.png
 best_hits_histogram_geom.png
 data/jump/raw_data/metadata.parquet
 data/*
+log/*

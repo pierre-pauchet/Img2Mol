@@ -11,7 +11,7 @@ def create_folders(args):
         pass
 
     try:
-        os.makedirs('outputs/' + args.exp_name)
+        os.makedirs("outputs/" + args.exp_name)
     except OSError:
         pass
 
@@ -20,14 +20,15 @@ def create_folders(args):
 def save_model(model, path):
     torch.save(model.state_dict(), path)
 
+
 def load_model(model, path):
     model.load_state_dict(torch.load(path))
     model.eval()
     return model
 
 
-#Gradient clipping
-class Queue():
+# Gradient clipping
+class Queue:
     def __init__(self, max_len=50):
         self.items = []
         self.max_len = max_len
@@ -61,8 +62,10 @@ def gradient_clipping(flow, gradnorm_queue):
         gradnorm_queue.add(float(grad_norm))
 
     if float(grad_norm) > max_grad_norm:
-        print(f'Clipped gradient with value {grad_norm:.1f} '
-              f'while allowed {max_grad_norm:.1f}')
+        print(
+            f"Clipped gradient with value {grad_norm:.1f} "
+            f"while allowed {max_grad_norm:.1f}"
+        )
     return grad_norm
 
 
@@ -92,7 +95,7 @@ def random_rotation(x):
         sin = torch.sin(theta)
         Rx[:, 1:2, 1:2] = cos
         Rx[:, 1:2, 2:3] = sin
-        Rx[:, 2:3, 1:2] = - sin
+        Rx[:, 2:3, 1:2] = -sin
         Rx[:, 2:3, 2:3] = cos
 
         # Build Ry
@@ -117,11 +120,11 @@ def random_rotation(x):
 
         x = x.transpose(1, 2)
         x = torch.matmul(Rx, x)
-        #x = torch.matmul(Rx.transpose(1, 2), x)
+        # x = torch.matmul(Rx.transpose(1, 2), x)
         x = torch.matmul(Ry, x)
-        #x = torch.matmul(Ry.transpose(1, 2), x)
+        # x = torch.matmul(Ry.transpose(1, 2), x)
         x = torch.matmul(Rz, x)
-        #x = torch.matmul(Rz.transpose(1, 2), x)
+        # x = torch.matmul(Rz.transpose(1, 2), x)
         x = x.transpose(1, 2)
     else:
         raise Exception("Not implemented Error")
@@ -131,18 +134,10 @@ def random_rotation(x):
 
 # Other utilities
 def get_wandb_username(username):
-    if username == 'cvignac':
-        return 'cvignac'
-    current_user = getpass.getuser()
-    if current_user == 'victor' or current_user == 'garciasa':
-        return 'vgsatorras'
-    else:
         return username
 
 
 if __name__ == "__main__":
-
-
     ## Test random_rotation
     bs = 2
     n_nodes = 16

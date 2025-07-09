@@ -13,20 +13,19 @@ import torch
 import tqdm
 
 def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dtype, property_norms, optim,
-                nodes_dist, gradnorm_queue, dataset_info, prop_dist, test_loaders):
+                nodes_dist, gradnorm_queue, dataset_info, prop_dist, test_loaders, prof):
     model_dp.train()
     model.train()
     model.to(device)
     nll_epoch = []
     n_iterations = len(loader)
     for i, data in enumerate(loader):
-
-        x = data['positions'].to(device, dtype)
-        node_mask = data['atom_mask'].to(device, dtype).unsqueeze(2)
-        edge_mask = data['edge_mask'].to(device, dtype)
-        one_hot = data['one_hot'].to(device, dtype)
-        charges = (data['charges'].to(device, dtype) if args.include_charges else torch.zeros(0))
-        phenotypes = (data['embeddings'].to(device) if args.conditioning_mode == 'cross_attention' else None)
+        x = data["positions"].to(device, dtype, non_blocking=True)
+        node_mask = data["atom_mask"].to(device, dtype, non_blocking=True).unsqueeze(2)
+        edge_mask = data["edge_mask"].to(device, dtype, non_blocking=True)
+        one_hot = data["one_hot"].to(device, dtype, non_blocking=True)
+        charges = (data["charges"].to(device, dtype, non_blocking=True) if args.include_charges else torch.zeros(0))
+        phenotypes = (data["embeddings"].to(device, non_blocking=True) if args.conditioning_mode == "cross_attention" else None)
         x = remove_mean_with_mask(x, node_mask)
 
         if args.augment_noise > 0:
@@ -41,8 +40,7 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
         check_mask_correct([x, one_hot, charges], node_mask)
         assert_mean_zero_with_mask(x, node_mask)
 
-        h = {'categorical': one_hot, 'integer': charges}
-
+        h = {"categorical": one_hot.to(device), "integer": charges.to(device)}
         if len(args.conditioning) > 0:
             if i ==0: 
                 context = qm9utils.prepare_context(args.conditioning, data, property_norms, verbose=True).to(device, dtype)
@@ -64,7 +62,7 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
         if args.clip_grad:
             grad_norm = utils.gradient_clipping(model, gradnorm_queue)
         else:
-            grad_norm = 0.
+            grad_norm = 0.0
 
         optim.step()
 
@@ -96,8 +94,8 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
                 vis.visualize_chain("outputs/%s/epoch_%d/conditional/" % (args.exp_name, epoch), dataset_info,
                                     wandb=wandb, mode='conditional')
         wandb.log({"Batch NLL": nll.item()}, commit=True)
-        wandb.log({'GradNorm': grad_norm}, commit=True)
-        
+        wandb.log({"GradNorm": grad_norm}, commit=True)
+        prof.step() if prof is not None else None
         if args.break_train_epoch:
             break
     wandb.log({"Train Epoch NLL": np.mean(nll_epoch)}, commit=True)
@@ -118,7 +116,7 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
         n_iterations = len(loader)
 
         for i, data in enumerate(loader):
-            x = data['positions'].to(device, dtype)
+            x = data["positions"].to(device, dtype)
             batch_size = x.size(0)
             node_mask = data['atom_mask'].to(device, dtype).unsqueeze(2)
             edge_mask = data['edge_mask'].to(device, dtype)
@@ -138,7 +136,7 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
             check_mask_correct([x, one_hot, charges], node_mask)
             assert_mean_zero_with_mask(x, node_mask)
 
-            h = {'categorical': one_hot, 'integer': charges}
+            h = {"categorical": one_hot, "integer": charges}
 
             if len(args.conditioning) > 0:
                 context = qm9utils.prepare_context(args.conditioning, data, property_norms).to(device, dtype)
@@ -157,7 +155,7 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
                 print(f"\r {partition} NLL \t epoch: {epoch}, iter: {i}/{n_iterations}, "
                       f"NLL: {nll_epoch/n_samples:.2f}")
 
-    return nll_epoch/n_samples
+    return nll_epoch / n_samples
 
 
 def save_and_sample_chain(model, args, device, dataset_info, prop_dist, test_loaders,
@@ -195,23 +193,22 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
     print(f'Sampling {n_samples} molecules at epoch {epoch} to calculate viability...')
     batch_size = min(batch_size, n_samples)
     assert n_samples % batch_size == 0
-    molecules = {'one_hot': [], 'x': [], 'node_mask': []}
-    for i in tqdm.tqdm(range(int(n_samples/batch_size))):
-        
+    molecules = {"one_hot": [], "x": [], "node_mask": []}
+    for i in tqdm.tqdm(range(int(n_samples / batch_size))):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(args, device, model_sample, dataset_info, prop_dist,
                                                 nodesxsample=nodesxsample, test_loaders=test_loaders)
 
-        molecules['one_hot'].append(one_hot.detach().cpu())
-        molecules['x'].append(x.detach().cpu())
-        molecules['node_mask'].append(node_mask.detach().cpu())
+        molecules["one_hot"].append(one_hot.detach().cpu())
+        molecules["x"].append(x.detach().cpu())
+        molecules["node_mask"].append(node_mask.detach().cpu())
 
     molecules = {key: torch.cat(molecules[key], dim=0) for key in molecules}
     validity_dict, rdkit_tuple = analyze_stability_for_molecules(molecules, dataset_info)
 
     wandb.log(validity_dict)
-    print("Atom Stability :", validity_dict['atm_stable'])
-    print("Molecule Stability :", validity_dict['mol_stable'])
+    print("Atom Stability :", validity_dict["atm_stable"])
+    print("Molecule Stability :", validity_dict["mol_stable"])
 
     if rdkit_tuple is not None:
         wandb.log({'Validity': rdkit_tuple[0][0], 'Uniqueness': rdkit_tuple[0][1], 'Novelty': rdkit_tuple[0][2],
