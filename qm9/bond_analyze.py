@@ -119,7 +119,7 @@ ALLOWED_VALENCIES = {
 
 ALLOWED_BONDS = {'H': 1, 'C': 4, 'N': 3, 'O': 2, 'F': 1, 'B': 3, 'Al': 3,
                  'Si': 4, 'P': [3, 5],
-                 'S': 6, 'Cl': 1, 'As': 3, 'Br': 1, 'I': 1, 'Hg': [1, 2],
+                 'S': [4,6], 'Cl': 1, 'As': 3, 'Br': 1, 'I': 1, 'Hg': [1, 2],
                  'Bi': [3, 5], 'Se':[4,6], 'Sn':[2,4], 'Na':1, 'K':1, 'Mo':3, 'V':[2,3,4,5],
                  }
 allowed_bonds = ALLOWED_BONDS

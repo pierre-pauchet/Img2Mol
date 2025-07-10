@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # Set CUDA_VISIBLE_DEVICES to use GPU 0
+os.environ["CUDA_VISIBLE_DEVICES"] = "1, 2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 0
 
 try:
     from rdkit import Chem
@@ -31,8 +31,8 @@ from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings, pro
 from train_test import train_epoch, test, analyze_and_save
 
 
-parser = argparse.ArgumentParser(description='E3Diffusion')
-parser.add_argument('--exp_name', type=str, default='')
+parser = argparse.ArgumentParser(description="E3Diffusion")
+parser.add_argument("--exp_name", type=str, default="")
 
 
 # Latent Diffusion args
@@ -154,6 +154,7 @@ parser.add_argument('--viability_metrics_epochs', type=int, default=None,
 
 args = parser.parse_args()
 
+
 if args.resume is not None:
     exp_name = args.exp_name + "_resume"
     start_epoch = args.start_epoch
@@ -171,7 +172,7 @@ if args.resume is not None:
     args.exp_name = exp_name
     args.start_epoch = start_epoch
     args.wandb_usr = wandb_usr
-
+    args.data_file = "/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy"
     # Careful with this -->
     if not hasattr(args, "normalization_factor"):
         args.normalization_factor = normalization_factor
@@ -303,12 +304,21 @@ def main():
     best_nll_val = 1e10
     # best_nll_test = 1e1
     test_loaders = dataloaders['test']
+    
+    ## Profiling 
+    # profiler(args=args, loader=dataloaders["train"], epoch=0, model=model, model_dp=model_dp,
+    #                 model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
+    #                 nodes_dist=nodes_dist, dataset_info=dataset_info,
+    #                 gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders)
+    # print("Done profiling")
+    
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
         train_epoch(args=args, loader=dataloaders['train'], epoch=epoch, model=model, model_dp=model_dp,
                     model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
-                    nodes_dist=nodes_dist, dataset_info=dataset_info,
-                    gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders)
+                    nodes_dist=nodes_dist, dataset_info=dataset_info, prof=None,
+                    gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, 
+                    test_loaders=test_loaders)
         print(f"Epoch took {time.time() - start_epoch:.1f} seconds.")
         if isinstance(model, en_diffusion.EnVariationalDiffusion):
             wandb.log(model.log_info(), commit=True)

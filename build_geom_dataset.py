@@ -192,7 +192,7 @@ def collate_fn(batch):
 
 
 class GeomDrugsDataLoader(DataLoader):
-    def __init__(self, sequential, dataset, batch_size, shuffle, drop_last=False):
+    def __init__(self, sequential, dataset, batch_size, shuffle, num_workers, drop_last=False):
 
         if sequential:
             # This goes over the data sequentially, advantage is that it takes
@@ -208,7 +208,8 @@ class GeomDrugsDataLoader(DataLoader):
             # Dataloader goes through data randomly and pads the molecules to
             # the largest molecule size.
             super().__init__(dataset, batch_size, shuffle=shuffle,
-                             collate_fn=collate_fn, drop_last=drop_last)
+                             collate_fn=collate_fn, drop_last=drop_last, 
+                             num_workers=num_workers)
 
 
 class GeomDrugsTransform(object):

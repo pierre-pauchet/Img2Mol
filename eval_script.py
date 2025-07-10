@@ -3,18 +3,20 @@ import numpy as np
 from os.path import join
 import pandas as pd
 import skfp
+# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
+import torch
 import argparse
 import pickle
-import util
+import utils
+
 from equivariant_diffusion.utils import assert_correctly_masked
 from qm9.sampling import sample_chain, sample
-from qm9.analyze import check_stability
 import qm9.visualizer as vis
 from qm9.models import get_latent_diffusion
 from configs.datasets_config import get_dataset_info
 from qm9 import dataset, losses
-import torch
+from metrics.viability import analyze_stability_for_molecules, check_stability
 
 
 def check_mask_correct(variables, node_mask):
@@ -166,7 +168,10 @@ def sample_only_stable_different_sizes(
     return one_hot_stable, charges_stable, x_stable, node_mask_stable
 
 
-def graph_to_mol(one_hot, charges, x, node_mask):
+def graph_to_mol_list(one_hot, charges, x, node_mask):
+    """ Graph output of model to a dict that is compatible with
+    analyze_staility_for_molecules"""
+    
     molecules = {"one_hot": [], "x": [], "node_mask": []}
     for i in range(one_hot.shape[0]):
         molecules["one_hot"].append(one_hot.detach().cpu())
@@ -174,6 +179,7 @@ def graph_to_mol(one_hot, charges, x, node_mask):
         molecules["node_mask"].append(node_mask.detach().cpu())
 
     molecules = {key: torch.cat(molecules[key], dim=0) for key in molecules}
+    
 
 
 def main():
@@ -281,19 +287,21 @@ def main():
         )
 
     # 3. Compute Viability metrics
-    stability_dict, rdkit_metrics = analyze_and_save(
-        args,
-        eval_args,
-        device,
-        generative_model,
-        nodes_dist,
-        prop_dist,
+    molecules_list = graph_to_mol_list(one_hot=one_hot, charges=charges, x=x, node_mask=node_mask)
+    
+    stability_dict, rdkit_metrics = analyze_stability_for_molecules(
+        molecules_list, 
         dataset_info,
-        n_samples=eval_args.n_samples,
-        batch_size=eval_args.batch_size_gen,
-        save_to_xyz=eval_args.save_to_xyz,
+        parallel=True
     )
-
+# TODO : rewrite analyze_stability_for_molecules so that it is not needed and 
+# the preprocess is done by a previous function.
+# Ideally, i want #3 to just be graph to mol, check_stability, metrics.evaluate
+    
+    # 4. Compute Fidelity metrics
+    
+    # 
+    
 
 if __name__ == "__main__":
     main()

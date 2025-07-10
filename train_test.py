@@ -96,7 +96,7 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
         wandb.log({"Batch NLL": nll.item()}, commit=True)
         wandb.log({"GradNorm": grad_norm}, commit=True)
         prof.step() if prof is not None else None
-        if args.break_train_epoch:
+        if args.break_train_epoch == 1:
             break
     wandb.log({"Train Epoch NLL": np.mean(nll_epoch)}, commit=True)
 

@@ -15,7 +15,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as sp_stats
 from qm9 import bond_analyze
-
+from configs.datasets_config import get_dataset_info
+import tqdm
+from equivariant_diffusion.utils import assert_correctly_masked
+from joblib import Parallel, delayed
 import os
 # 'atom_decoder': ['H', 'B', 'C', 'N', 'O', 'F', 'Al', 'Si', 'P', 'S', 'Cl', 'As', 'Br', 'I', 'Hg', 'Bi'],
 
@@ -247,41 +250,75 @@ def check_stability(positions, atom_type, dataset_info, debug=False):
     molecule_stable = nr_stable_atoms == len(x)
     return molecule_stable, nr_stable_atoms, len(x)
 
+    # 
+    #     """ Mask atoms, return a tuple of positions and atom types"""
+    # processed = []
 
+    # for batch in tqdm.tqdm(dataloader):
+    #     device = batch['positions'].device  # safer than dataloader.device()
+    #     positions_batch = batch['positions']   # shape: (B, N, 3)
+    #     one_hot_batch = batch['one_hot']       # shape: (B, N, 5)
+    #     mask_batch = batch['atom_mask']        # shape: (B, N)
+
+    #     B = positions_batch.size(0)
+
+    #     for i in range(B):
+    #         pos = positions_batch[i]           # (N, 3)
+    #         one_hot = one_hot_batch[i].float() # (N, 5)
+    #         mask = mask_batch[i].to(torch.bool)
+
+    #         pos = pos[mask]
+    #         one_hot = one_hot[mask]
+
+    #         atom_type = torch.argmax(one_hot, dim=1)
+    #         processed.append((pos, atom_type))
+
+    # return processed
 def process_loader(dataloader):
-    """ Mask atoms, return positions and atom types"""
-    out = []
-    for data in dataloader:
-        for i in range(data['positions'].size(0)):
-            positions = data['positions'][i].view(-1, 3)
-            one_hot = data['one_hot'][i].view(-1, 5).type(torch.float32)
-            mask = data['atom_mask'][i].flatten()
-            positions, one_hot = positions[mask], one_hot[mask]
-            atom_type = torch.argmax(one_hot, dim=1)
-            out.append((positions, atom_type))
-    return out
+
+    molecules = {'one_hot': [], 'x': [], 'node_mask': []}
+
+    for batch in tqdm.tqdm(dataloader):
+        o_h = batch["one_hot"].detach().cpu().float()
+        pos = batch["positions"].detach().cpu()
+        mask = batch["atom_mask"].detach().cpu().unsqueeze(2)
+    
+        B=batch["positions"].size(0)
+
+        for i in range(B):
+            molecules['one_hot'].append(o_h[i])
+            molecules['x'].append(pos[i])
+            molecules['node_mask'].append(mask[i])
+            assert_correctly_masked(pos[i], mask[i])
+            assert_correctly_masked(o_h[i].float(), mask[i])
+            
+    # molecules = {key: torch.cat(molecules[key], dim=0) for key in molecules}
+
+    return molecules
 
 
-def main_check_stability(remove_h: bool, batch_size=32):
+def main_check_stability(remove_h: bool, batch_size=256):
     from configs import datasets_config
     import qm9.dataset as dataset
     class Config:
         def __init__(self):
             self.batch_size = batch_size
             self.num_workers = 8
-            self.remove_h = True
+            self.remove_h = remove_h
             self.filter_n_atoms = None
-            self.datadir = '/projects/iktos/pierre/CondGeoLDM/charac.npy'
+            self.data_file = '/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy'
             self.dataset = 'jump'
             self.include_charges = True
             self.filter_molecule_size = None
             self.sequential = False
-            self.percent_train_ds = 5
+            self.percent_train_ds = 100
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            self.conditioning_type = "attention"
+            
 
     cfg = Config()
 
-    dataset_info = datasets_config.jump
+    dataset_info = get_dataset_info(cfg.dataset, cfg.remove_h)
     dataloaders, charge_scale = dataset.retrieve_dataloaders(cfg)
     if use_rdkit:
         from qm9.rdkit_functions import BasicMolecularMetrics
@@ -294,37 +331,47 @@ def main_check_stability(remove_h: bool, batch_size=32):
         count_atm_stable = 0
         count_mol_total = 0
         count_atm_total = 0
-        for [positions, atom_types] in dataloader:
-            is_stable, nr_stable, total = check_stability(
-                positions, atom_types, dataset_info)
+        print(len(dataloader))
+        print(dataloader[100])
+        for i, (positions, atom_types) in enumerate(dataloader):
 
-            count_atm_stable += nr_stable
-            count_atm_total += total
+            is_stable, n_stable_atoms, n_total_atoms = check_stability(positions, atom_types, dataset_info)
+
+            count_atm_stable += n_stable_atoms
+            count_atm_total += n_total_atoms
 
             count_mol_stable += int(is_stable)
             count_mol_total += 1
 
-            print(f"Stable molecules "
-                  f"{100. * count_mol_stable/count_mol_total:.2f} \t"
-                  f"Stable atoms: "
-                  f"{100. * count_atm_stable/count_atm_total:.2f} \t"
-                  f"Counted molecules {count_mol_total}/{len(dataloader)*batch_size}")
+            print(
+                f"Stable molecules: {100. * count_mol_stable / count_mol_total:.2f}%\t"
+                f"Stable atoms: {100. * count_atm_stable / count_atm_total:.2f}%\t"
+                f"Counted molecules: {count_mol_total}/{len(dataloader)}"
+        )
 
     train_loader = dataloaders['train']
     test_loader = dataloaders['test']
-    if use_rdkit:
-        print('For test')
-        metrics.evaluate(test_loader)
-        print('For train')
-        metrics.evaluate(train_loader)
-    else:
-        print('For train')
-        test_validity_for(train_loader)
-        print('For test')
-        test_validity_for(test_loader)
+    
+    
+    train_data = process_loader(train_loader)
+    test_data = process_loader(test_loader)
+    train_dic, train_metrics = analyze_stability_for_molecules(train_data, dataset_info, parallel=True)
+    test_dic, test_metrics = analyze_stability_for_molecules(test_data, dataset_info)
+    # if use_rdkit:
+    #     print('For train')
+    #     metrics.evaluate(train_data)
+    #     print('For test')
+    #     metrics.evaluate(test_data)
+    # # else:
+    # print('For train')
+    # test_validity_for(train_data)
+    # print('For test')
+    # test_validity_for(test_data)
+    print("train",train_dic)
+    print("test",test_dic)
 
 
-def analyze_stability_for_molecules(molecule_list, dataset_info):
+def analyze_stability_for_molecules(molecule_list, dataset_info, parallel=False):
     one_hot = molecule_list['one_hot']
     x = molecule_list['x']
     node_mask = molecule_list['node_mask']
@@ -350,15 +397,27 @@ def analyze_stability_for_molecules(molecule_list, dataset_info):
         pos = pos[0:int(atomsxmol[i])]
         processed_list.append((pos, atom_type))
 
-    for mol in processed_list:
-        pos, atom_type = mol
-        validity_results = check_stability(pos, atom_type, dataset_info)
+    if parallel: 
+        results = Parallel(n_jobs=os.cpucount()-2, backend="loky")(
+            delayed(check_stability)(pos, atom_type, dataset_info)
+            for (pos, atom_type) in tqdm.tqdm(processed_list, desc="Computing stability")
+        )
+            
+        
+        for is_stable, n_stable, total in results:
+            molecule_stable += int(is_stable)
+            nr_stable_atoms += int(n_stable)
+            n_atoms += int(total)
+    else : 
+        for mol in tqdm.tqdm(processed_list, desc="Computing stability"):
+            pos, atom_type = mol
+            validity_results = check_stability(pos, atom_type, dataset_info)
 
-        molecule_stable += int(validity_results[0])
-        nr_stable_atoms += int(validity_results[1])
-        n_atoms += int(validity_results[2])
+            molecule_stable += int(validity_results[0])
+            nr_stable_atoms += int(validity_results[1])
+            n_atoms += int(validity_results[2])
 
-    # Validity
+    # Stabilit
     fraction_mol_stable = molecule_stable / float(n_samples)
     fraction_atm_stable = nr_stable_atoms / float(n_atoms)
     validity_dict = {
@@ -393,6 +452,6 @@ def analyze_node_distribution(mol_list, save_path):
 
 if __name__ == '__main__':
 
-    main_analyze_qm9(remove_h=False, dataset_name='qm9')
+    # main_analyze_qm9(remove_h=False, dataset_name='qm9')
     main_check_stability(remove_h=False)
 

@@ -150,8 +150,8 @@ def collate_fn(batch):
 
 
 class JumpDataLoader(DataLoader):
-    def __init__(self, sequential, dataset, batch_size, shuffle, pin_memory=True, 
-                 drop_last=True, n_debug_samples=None, persistent_workers=True):
+    def __init__(self, sequential, dataset, batch_size, shuffle, num_workers, pin_memory=True, 
+                 drop_last=True, prefetch_factors=2, persistent_workers=True):
 
         if sequential:
             # This goes over the data sequentially, advantage is that it takes
@@ -161,7 +161,9 @@ class JumpDataLoader(DataLoader):
             sampler = SequentialSampler(dataset)
             batch_sampler = CustomBatchSampler(sampler, batch_size, drop_last,
                                                dataset.split_indices)
-            super().__init__(dataset, batch_sampler=batch_sampler)
+            super().__init__(dataset, batch_sampler=batch_sampler, persistent_workers=persistent_workers,
+                             prefetch_factor=prefetch_factors, num_workers=num_workers, 
+                             pin_memory = pin_memory)
 
         else:
             # Dataloader goes through data randomly and pads the molecules to

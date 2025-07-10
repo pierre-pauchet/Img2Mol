@@ -70,7 +70,8 @@ def retrieve_dataloaders(cfg):
             # Sequential dataloading disabled for now.
             dataloaders[key] = build_jump_dataset.JumpDataLoader(
             sequential=cfg.sequential, dataset=dataset, batch_size=cfg.batch_size,
-            shuffle=shuffle)
+            shuffle=shuffle,
+            num_workers=cfg.num_workers)
             
         del split_data
         charge_scale = None

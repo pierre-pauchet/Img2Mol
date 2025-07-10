@@ -9,7 +9,7 @@ import argparse
 from qm9 import dataset
 from qm9.models import get_model, get_autoencoder, get_latent_diffusion
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from equivariant_diffusion.utils import assert_mean_zero_with_mask, remove_mean_with_mask,\
     assert_correctly_masked
 import torch
@@ -45,7 +45,8 @@ def analyze_and_save(args, eval_args, device, generative_model,
     for i in tqdm.tqdm(range(int(n_samples/batch_size))):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(
-            args, device, generative_model, dataset_info, prop_dist=prop_dist, nodesxsample=nodesxsample)
+            args, device, generative_model, dataset_info, prop_dist=prop_dist, 
+            nodesxsample=nodesxsample)
 
         molecules['one_hot'].append(one_hot.detach().cpu())
         molecules['x'].append(x.detach().cpu())
@@ -148,10 +149,11 @@ def main():
     dtype = torch.float32
     utils.create_folders(args)
     print(args)
-
+    if args.dataset =='jump' and not args.remove_h:
+        args.data_file = "/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy"
     # Retrieve QM9 dataloaders
     dataloaders, charge_scale = dataset.retrieve_dataloaders(args)
-
+    
     dataset_info = get_dataset_info(args.dataset, args.remove_h)
 
     # Load model

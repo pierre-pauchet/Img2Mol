@@ -2,7 +2,8 @@ import torch
 import pandas as pd
 import numpy as np
 import os
-
+from torch.profiler import schedule, profile, record_function, ProfilerActivity
+from train_test import train_epoch
 def compute_mean_mad(dataloaders, properties, dataset_name):
     if dataset_name in ["qm9", "jump"]:
         return compute_mean_mad_from_dataloader(dataloaders["train"], properties)
@@ -114,3 +115,55 @@ def prepare_embeddings(minibatch, verbose=False):
     print("Context shape:", context.shape)
     print('DONE')
     return context
+
+
+def trace_handler(p):
+    for device in ["cuda", 'cpu']:
+        sort_by_keyword = "self_" + device + "_time_total"
+        output = p.key_averages().table(sort_by=sort_by_keyword, 
+                                        row_limit=10,)
+        print(output)    
+        print(f"Trace handler called at step {p.step_num}")
+        # Save to a plain .txt file
+        log_path = os.path.join("./log/", f"profile_step_{p.step_num}_{device}.txt")
+        with open(log_path, "w") as f:
+            f.write(output)
+
+        detailed_log_path = os.path.join("./log/", f"profile_step_{p.step_num}_mul_stacktrace.txt")
+        print(f"[Profiler] Saved readable profile to: {log_path}")
+        with open(detailed_log_path, "w") as f:
+            for evt in p.events():
+                if "aten::mul" in evt.name:
+                    dev = "cuda" if evt.device_type == torch.profiler.ProfilerActivity.CUDA else "cpu"
+                    f.write(f"[aten::mul] device: {dev}, cpu_time: {evt.cpu_time_total}ns, cuda_time: {evt.cuda_time_total}ns\n")
+                    f.write("Stack trace:\n")
+                    for frame in evt.stack:
+                        f.write(f"  {frame}\n")
+                    f.write("\n")
+        
+def profiler(args, loader, epoch, model, model_dp,
+                    model_ema, ema, device, dtype, property_norms,
+                    nodes_dist, dataset_info,
+                    gradnorm_queue, optim, prop_dist, test_loaders):
+    """ 
+    """
+    my_schedule = schedule(
+        skip_first=10,
+        wait=5,
+        warmup=1,
+        active=3,
+        repeat=2)
+    with profile(schedule=my_schedule,
+                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                record_shapes=True,
+                profile_memory=True,
+                with_stack=True,
+                on_trace_ready=trace_handler
+    ) as prof:
+        with record_function("model_inference"):
+            print("Profiling your code")
+            train_epoch(args=args, loader=loader, epoch=epoch, model=model, model_dp=model_dp,
+                    model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
+                    nodes_dist=nodes_dist, dataset_info=dataset_info,
+                    gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders,
+                    prof=prof)       
