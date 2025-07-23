@@ -135,6 +135,7 @@ class BasicMolecularMetrics(object):
                 novel.append(smiles)
                 num_novel += 1
         return novel, num_novel / len(unique)
+    
     def compute_molecules_stability_from_graph(self, adjacency_matrices, numbers, charges, allowed_bonds=None,
         aromatic=True):
         if adjacency_matrices.ndim == 2:
@@ -213,7 +214,7 @@ class BasicMolecularMetrics(object):
             # stable_atoms_list.append(stable_atoms.item())
             # atom_counts_list.append(atom_count.item())
             
-
+    # def save_outliers
         
     def evaluate(self, generated):
         """ generated: list of pairs (positions: n x 3, atom_types: n [int])

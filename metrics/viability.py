@@ -108,6 +108,7 @@ class BasicMolecularMetrics(object):
                 largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
                 smiles = mol2smiles(largest_mol)
                 valid.append(smiles)
+                valid_mols.append(largest_mol)
         return valid, len(valid) / len(generated), len(connected) / len(generated), valid_mols
 
     def compute_uniqueness(self, valid):
@@ -285,6 +286,8 @@ def _check_single_molecule(mol, dataset_info):
     pos, atom_type = mol
     return check_stability(pos, atom_type, dataset_info)
 
+
+
 def main_check_stability(remove_h: bool, batch_size=256):
     class Config:
         def __init__(self):
@@ -332,6 +335,7 @@ def main_check_stability(remove_h: bool, batch_size=256):
     # test_validity_for(test_data)
     print("train",train_dic)
     print("test",test_dic)
+
 
 def analyze_stability_for_molecules(molecule_list, dataset_info, parallel=False):
     one_hot = molecule_list['one_hot']
@@ -389,11 +393,11 @@ def analyze_stability_for_molecules(molecule_list, dataset_info, parallel=False)
 
     if use_rdkit:
         metrics = BasicMolecularMetrics(dataset_info)
-        rdkit_metrics = metrics.evaluate(processed_list)
+        rdkit_metrics, mols = metrics.evaluate(processed_list)
         #print("Unique molecules:", rdkit_metrics[1])
-        return validity_dict, rdkit_metrics
+        return validity_dict, rdkit_metrics, mols
     else:
-        return validity_dict, None
+        return validity_dict, None, mols
 
 
 # def analyze_node_distribution(mol_list, save_path):

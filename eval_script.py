@@ -9,6 +9,7 @@ import torch
 import argparse
 import pickle
 import utils
+import time
 
 from equivariant_diffusion.utils import assert_correctly_masked
 from qm9.sampling import sample_chain, sample
@@ -17,7 +18,8 @@ from qm9.models import get_latent_diffusion
 from configs.datasets_config import get_dataset_info
 from qm9 import dataset, losses
 from metrics.viability import analyze_stability_for_molecules, check_stability
-
+from metrics.fidelity import rdkit_mols_to_fingerprints, compute_self_similarity, compute_retrieval, \
+                                read_fingerprints_file, compute_self_similarity_joblib
 
 def check_mask_correct(variables, node_mask):
     for variable in variables:
@@ -77,6 +79,7 @@ def sample_different_sizes(
     save=False,
 ):
     nodesxsample = nodes_dist.sample(n_samples)
+
     one_hot, charges, x, node_mask = sample(
         args, device, generative_model, dataset_info, nodesxsample=nodesxsample
     )
@@ -95,7 +98,7 @@ def sample_different_sizes(
     return one_hot, charges, x, node_mask
 
 
-def sample_only_stable_different_sizes(
+def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*n_samples samples
     args,
     eval_args,
     device,
@@ -107,8 +110,9 @@ def sample_only_stable_different_sizes(
     save=False,
 ):
     assert n_tries > n_samples
-
-    nodesxsample = nodes_dist.sample(n_tries)
+    nodesxsample = torch.full((n_tries,), 26)
+    
+    # nodesxsample = nodes_dist.sample(n_tries) #UNCOMMENT 
     one_hot, charges, x, node_mask = sample(
         args, device, flow, dataset_info, nodesxsample=nodesxsample
     )
@@ -172,39 +176,35 @@ def graph_to_mol_list(one_hot, charges, x, node_mask):
     """ Graph output of model to a dict that is compatible with
     analyze_staility_for_molecules"""
     
-    molecules = {"one_hot": [], "x": [], "node_mask": []}
-    for i in range(one_hot.shape[0]):
-        molecules["one_hot"].append(one_hot.detach().cpu())
-        molecules["x"].append(x.detach().cpu())
-        molecules["node_mask"].append(node_mask.detach().cpu())
-
-    molecules = {key: torch.cat(molecules[key], dim=0) for key in molecules}
-    
+    molecules = {
+        "one_hot": one_hot.detach().cpu(),
+        "x": x.detach().cpu(), 
+        "node_mask": node_mask.detach().cpu()
+    }
+    return molecules    
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sample mol with conditioning drawn from clusters"
-    )
+        description="Sample mol with conditioning drawn from clusters")
 
     parser.add_argument(
-        "--n_samples", type=int, default=10, help="Number of samples to generate"
-    )
+        "--n_samples", type=int, default=10, help="Number of samples to generate")
     parser.add_argument(
-        "--n_tries",
-        type=int,
-        default=50,
-        help="Number of tries to find stable molecules",
-    )
+        "--n_tries",type=int, default=50,help="Number of tries to find stable molecules",)
     parser.add_argument(
-        "--data_file",
-        type=str,
-        default="/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy",
-        help="Conditioning type: geom, jump, or both",
-    )
+        "--n_nodes",type=int, default=44 ,help="Size of fixed-sized generation")
+    parser.add_argument(
+        "--data_file",type=str, default="/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy",
+        help="Conditioning type: geom, jump, or both")
+    parser.add_argument('--train_fp_file', type=str, default="./CondGeoLDM/data/fingerprints_data/jump_fingerprints.npy",
+                        help='Path to the embeddings data directory')
+    
     parser.add_argument("--model_path", type=str, default="CondGeoLDM/outputs")
-    parser.add_argument("--stable_only", type=bool, default="False")
-    parser.add_argument("--visualise_chain", type=bool, default="False")
+    parser.add_argument("--stable_only", action="store_true")
+    parser.add_argument("--visualise_chain", action="store_true")
+    parser.add_argument("--save_samples", action="store_true")
+
     # Parse the arguments
     eval_args, _ = parser.parse_known_args()
     print(eval_args)
@@ -218,7 +218,6 @@ def main():
     args.device = device
     dtype = torch.float32
     utils.create_folders(args)
-    print(args)
 
     # Retrieve dataset info and dataloaders
     dataset_info = get_dataset_info(args.dataset, args.remove_h)
@@ -237,7 +236,9 @@ def main():
     flow_state_dict = torch.load(join(eval_args.model_path, fn), map_location=device)
     flow.load_state_dict(flow_state_dict)
 
+    
     # 1. Sample molecules from trained models.
+    print("Sampling molecules...")
     if eval_args.stable_only:
         one_hot, charges, x, node_mask = sample_only_stable_different_sizes(
             args,
@@ -248,7 +249,7 @@ def main():
             dataset_info,
             n_samples=eval_args.n_samples,
             n_tries=eval_args.n_tries,
-            save=False,
+            save=eval_args.save_samples,
         )
     else:
         one_hot, charges, x, node_mask = sample_different_sizes(
@@ -259,11 +260,11 @@ def main():
             nodes_dist,
             dataset_info,
             n_samples=eval_args.n_samples,
-            save=eval_args.save,
+            save=eval_args.save_samples,
         )
 
-    if not eval_args.save:
-        print("Need args.save==True to visualize sampled molecules")
+    if not eval_args.save_samples:
+        print("Need args.save_samples==True to visualize sampled molecules")
     else:
         print("Visualizing molecules.")
         vis.visualize(
@@ -289,7 +290,7 @@ def main():
     # 3. Compute Viability metrics
     molecules_list = graph_to_mol_list(one_hot=one_hot, charges=charges, x=x, node_mask=node_mask)
     
-    stability_dict, rdkit_metrics = analyze_stability_for_molecules(
+    stability_dict, rdkit_metrics, rdkit_mols = analyze_stability_for_molecules(
         molecules_list, 
         dataset_info,
         parallel=True
@@ -300,8 +301,33 @@ def main():
     
     # 4. Compute Fidelity metrics
     
-    # 
+    fp = rdkit_mols_to_fingerprints(rdkit_mols)
+    train_fp = read_fingerprints_file("./data/fingerprints_data/jump_fingerprints.npy")
+                                      
+    # self_sim = compute_self_similarity(fp)
+    # histogram, retrieval = compute_retrieval(fp, train_fp)
     
+    # print("Self-similarity: ",self_sim)
+    # print("Retrieval: ", retrieval)
+    subset = train_fp[:50000]
 
+    # # Mesure du temps pour la version normale
+    start_time = time.time()
+    sim1 = compute_self_similarity(subset)
+    end_time = time.time()
+    print(f"compute_self_similarity took {end_time - start_time:.2f} seconds")
+
+    # Version parallélisée avec joblib
+    start_time = time.time()
+    sim2 = compute_self_similarity_joblib(subset)
+    end_time = time.time()
+    print(f"compute_self_similarity_joblib took {end_time - start_time:.2f} seconds")
+
+    # Vérification de cohérence
+    if np.allclose(sim1, sim2, atol=1e-3):
+        print("Résultats cohérents entre les deux implémentations.")
+    else:
+        print("Attention : les résultats diffèrent.")
+    
 if __name__ == "__main__":
     main()

@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1, 2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 0
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 
 
 try:
     from rdkit import Chem
@@ -156,23 +156,24 @@ args = parser.parse_args()
 
 
 if args.resume is not None:
+    resume = args.resume
+    
+    with open(join(args.resume, "args.pickle"), "rb") as f:
+        args = pickle.load(f)
     exp_name = args.exp_name + "_resume"
     start_epoch = args.start_epoch
-    resume = args.resume
     wandb_usr = args.wandb_usr
     normalization_factor = args.normalization_factor
     aggregation_method = args.aggregation_method
 
-    with open(join(args.resume, "args.pickle"), "rb") as f:
-        args = pickle.load(f)
 
     args.resume = resume
     args.break_train_epoch = False
 
+    args.batch_size = 32
     args.exp_name = exp_name
     args.start_epoch = start_epoch
     args.wandb_usr = wandb_usr
-    args.data_file = "/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy"
     # Careful with this -->
     if not hasattr(args, "normalization_factor"):
         args.normalization_factor = normalization_factor
