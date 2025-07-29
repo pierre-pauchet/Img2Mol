@@ -269,7 +269,7 @@ def plot_data3d_uncertainty(
 
 
 
-def visualize(path, dataset_info, max_num=25, wandb=None, spheres_3d=False):
+def visualize(path, dataset_info, max_num=50, wandb=None, spheres_3d=False):
     files = load_xyz_files(path)[0:max_num]
     for file in files:
         positions, one_hot, charges = load_molecule_xyz(file, dataset_info)

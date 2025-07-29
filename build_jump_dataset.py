@@ -151,7 +151,7 @@ def collate_fn(batch):
 
 class JumpDataLoader(DataLoader):
     def __init__(self, sequential, dataset, batch_size, shuffle, num_workers, pin_memory=True, 
-                 drop_last=True, prefetch_factors=2, persistent_workers=True):
+                 drop_last=True, prefetch_factors=3, persistent_workers=True):
 
         if sequential:
             # This goes over the data sequentially, advantage is that it takes

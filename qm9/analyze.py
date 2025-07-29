@@ -398,7 +398,7 @@ def analyze_stability_for_molecules(molecule_list, dataset_info, parallel=False)
         processed_list.append((pos, atom_type))
 
     if parallel: 
-        results = Parallel(n_jobs=os.cpucount()-2, backend="loky")(
+        results = Parallel(n_jobs=os.cpu_count()-2, backend="loky")(
             delayed(check_stability)(pos, atom_type, dataset_info)
             for (pos, atom_type) in tqdm.tqdm(processed_list, desc="Computing stability")
         )

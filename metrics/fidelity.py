@@ -39,7 +39,7 @@ def rdkit_mols_to_fingerprints(mols_list, fp_size=1024, radius=2):
     return fingerprints
     
     
-def compute_retrieval(fingerprints, train_fingerprints, threshold=0.8):
+def compute_retrieval(fingerprints, train_fingerprints, threshold=0.95):
     """
     Compute retrieval metrics based on Tanimoto distances.
     Ie : How close the nearest neighbors of the newly generated molecules is to

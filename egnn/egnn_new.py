@@ -171,6 +171,7 @@ class EquivariantBlock(nn.Module):
         self.to(self.device)
 
     def forward(self, h, x, edge_index, node_mask=None, edge_mask=None, edge_attr=None, phenotypes=None):
+        h0, x0 = h, x
         distances, coord_diff = coord2diff(x, edge_index, self.norm_constant)
         if self.sin_embedding is not None:
             distances = self.sin_embedding(distances)
@@ -182,6 +183,9 @@ class EquivariantBlock(nn.Module):
         # Important, the bias of the last linear might be non-zero
         if node_mask is not None:
             h = h * node_mask
+        # skip connections 
+        h = h + h0 
+        x = x + x0
         return h, x
 
 

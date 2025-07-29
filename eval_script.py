@@ -110,9 +110,8 @@ def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*
     save=False,
 ):
     assert n_tries > n_samples
-    nodesxsample = torch.full((n_tries,), 26)
     
-    # nodesxsample = nodes_dist.sample(n_tries) #UNCOMMENT 
+    nodesxsample = nodes_dist.sample(n_tries) 
     one_hot, charges, x, node_mask = sample(
         args, device, flow, dataset_info, nodesxsample=nodesxsample
     )

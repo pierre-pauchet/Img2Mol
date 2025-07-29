@@ -958,7 +958,7 @@ class EnHierarchicalVAE(torch.nn.Module):
         zeros, ones = torch.zeros_like(z_x_mu), torch.ones_like(z_x_sigma.mean(dim=(1,2)))
         subspace_d = self.subspace_dimensionality(node_mask)
         loss_kl_x = gaussian_KL_for_dimension(z_x_mu, ones, zeros, ones, subspace_d)
-        loss_kl = loss_kl_h + loss_kl_x
+        loss_kl = loss_kl_h + loss_kl_x # TODO:Not weighted ?
 
         # Infer latent z.
         z_xh_mean = torch.cat([z_x_mu, z_h_mu], dim=2)

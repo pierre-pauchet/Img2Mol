@@ -206,7 +206,8 @@ class BasicMolecularMetrics(object):
         """ generated: list of pairs (positions: n x 3, atom_types: n [int])
             the positions and atom types should already be masked. """
         valid, validity, connectivity, valid_mols = self.compute_validity_and_connectivity(generated)
-        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(f"""Validity over {len(generated)} molecules: {validity * 100 :.2f}%\n
+              Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%""")
         if validity > 0:
             unique, uniqueness = self.compute_uniqueness(valid)
             print(f"Uniqueness over {len(valid)} valid molecules: {uniqueness * 100 :.2f}%")
@@ -295,12 +296,12 @@ def main_check_stability(remove_h: bool, batch_size=256):
             self.num_workers = 8
             self.remove_h = remove_h
             self.filter_n_atoms = None
-            self.data_file = '/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy'
+            self.data_file = '/projects/iktos/pierre/CondGeoLDM/data/jump/charac_1_h.npy'
             self.dataset = 'jump'
             self.include_charges = True
             self.filter_molecule_size = None
             self.sequential = False
-            self.percent_train_ds = 100
+            self.percent_train_ds = 1
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
             self.conditioning_type = "attention"
             
@@ -413,3 +414,6 @@ def analyze_stability_for_molecules(molecule_list, dataset_info, parallel=False)
 #     print("Histogram of # atom types")
 #     print(hist_atom_type.bins)
 #     hist_nodes.normalize()
+if __name__ == '__main__':
+
+    main_check_stability(remove_h=False)

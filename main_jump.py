@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"  # Set CUDA_VISIBLE_DEVICES to use GPU 
 
 try:
     from rdkit import Chem
@@ -36,7 +36,7 @@ parser.add_argument("--exp_name", type=str, default="")
 
 
 # Latent Diffusion args
-parser.add_argument('--train_diffusion', action='store_true', default=True,
+parser.add_argument('--train_diffusion', action='store_true',
                     help='Train second stage LatentDiffusionModel model')
 parser.add_argument('--ae_path', type=str, default=None,
                     help='Specify first stage model path')

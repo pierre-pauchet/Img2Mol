@@ -220,7 +220,8 @@ class BasicMolecularMetrics(object):
         """ generated: list of pairs (positions: n x 3, atom_types: n [int])
             the positions and atom types should already be masked. """
         valid, validity, connectivity, _ = self.compute_validity_and_connectivity(generated)
-        print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
+        print(f"""Validity over {len(generated)} molecules: {validity * 100 :.2f}%\n
+              Connectivity over {len(generated)} molecules: {connectivity * 100 :.2f}%""")
         if validity > 0:
             unique, uniqueness = self.compute_uniqueness(valid)
             print(f"Uniqueness over {len(valid)} valid molecules: {uniqueness * 100 :.2f}%")
