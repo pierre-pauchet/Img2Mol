@@ -118,6 +118,7 @@ def get_latent_diffusion(args, device, dataset_info, dataloader_train):
     if not hasattr(first_stage_args, 'aggregation_method'):
         first_stage_args.aggregation_method = 'sum'
 
+    first_stage_args.current_epoch = None
     device = torch.device("cuda" if first_stage_args.cuda else "cpu")
 
     first_stage_model, nodes_dist, prop_dist = get_autoencoder(
@@ -133,7 +134,10 @@ def get_latent_diffusion(args, device, dataset_info, dataloader_train):
     # Create the second stage model (Latent Diffusions).
     args.latent_nf = first_stage_args.latent_nf
     in_node_nf = args.latent_nf
-
+    diff = {k: (vars(first_stage_args)[k], vars(args).get(k)) 
+        for k in vars(first_stage_args) 
+        if vars(first_stage_args)[k] != vars(args).get(k)}
+    print('Diff', diff)
     if args.condition_time:
         dynamics_in_node_nf = in_node_nf + 1
     else:

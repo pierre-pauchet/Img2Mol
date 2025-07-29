@@ -17,7 +17,7 @@ import time
 import tqdm
 import pickle
 from configs.datasets_config import get_dataset_info
-from os.path import join
+from pathlib import Path
 from qm9.sampling import sample
 from qm9.analyze import analyze_stability_for_molecules, analyze_node_distribution
 from qm9.utils import prepare_context, compute_mean_mad
@@ -58,9 +58,10 @@ def analyze_and_save(args, eval_args, device, generative_model,
         #     current_num_samples, n_samples, secs_per_sample))
 
         if save_to_xyz:
+            io_path = Path(args.datadir)
             id_from = i * batch_size
             qm9_visualizer.save_xyz_file(
-                join(eval_args.model_path, 'eval/analyzed_molecules/'),
+                io_path / eval_args.model_path / 'eval/analyzed_molecules/',
                 one_hot, charges, x, dataset_info, id_from, name='molecule',
                 node_mask=node_mask)
 
@@ -118,12 +119,14 @@ def test(args, flow_dp, nodes_dist, device, dtype, loader, partition='Test', num
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--datadir', type=str, default="/import/pr_iktos/pierre/CondGeoLDM",
+                        help='specify absolute root of model path')
     parser.add_argument('--model_path', type=str, default="outputs/edm_1    ",
-                        help='Specify model path')
+                        help='Specify relative model path')
     parser.add_argument('--n_samples', type=int, default=100,
-                        help='Specify model path')
+                        help='Amount of samples')
     parser.add_argument('--batch_size_gen', type=int, default=100,
-                        help='Specify model path')
+                        help='For batched gen')
     parser.add_argument('--save_to_xyz', type=eval, default=False,
                         help='Should save samples to xyz files.')
     parser.add_argument('--conditioning_mode', type=str, default='original',)
@@ -131,8 +134,8 @@ def main():
     eval_args, unparsed_args = parser.parse_known_args()
 
     assert eval_args.model_path is not None
-
-    with open(join(eval_args.model_path, "args.pickle"), "rb") as f:
+    io_path = Path(eval_args.datadir)
+    with open(io_path / eval_args.model_path / "args.pickle", "rb") as f:
         args = pickle.load(f)
 
     # CAREFUL with this -->
@@ -150,7 +153,7 @@ def main():
     utils.create_folders(args)
     print(args)
     if args.dataset =='jump' and not args.remove_h:
-        args.data_file = "/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy"
+        args.data_file = str(io_path / "data"/ "jump" /"charac_30_h.npy")
     # Retrieve QM9 dataloaders
     dataloaders, charge_scale = dataset.retrieve_dataloaders(args)
     
@@ -164,7 +167,7 @@ def main():
     generative_model.to(device)
 
     fn = 'generative_model_ema.npy' if args.ema_decay > 0 else 'generative_model.npy'
-    flow_state_dict = torch.load(join(eval_args.model_path, fn), map_location=device)
+    flow_state_dict = torch.load(str(io_path / eval_args.model_path / fn), map_location=device)
     generative_model.load_state_dict(flow_state_dict)
 
     # Analyze stability, validity, uniqueness and novelty
@@ -200,7 +203,7 @@ def main():
     print(f'Final test nll {test_nll}')
 
     print(f'Overview: val nll {val_nll} test nll {test_nll}', stability_dict)
-    with open(join(eval_args.model_path, 'eval_log.txt'), 'w') as f:
+    with open(io_path / eval_args.model_path / 'eval_log.txt', 'w') as f:
         print(f'Overview: val nll {val_nll} test nll {test_nll}',
               stability_dict,
               file=f)

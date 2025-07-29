@@ -2,10 +2,11 @@ from torch.utils.data import DataLoader
 from qm9.data.args import init_argparse
 from qm9.data.collate import PreprocessQM9
 from qm9.data.utils import initialize_datasets
-import os
-
+from pathlib import Path
 
 def retrieve_dataloaders(cfg):
+    io_path = Path(cfg.datadir).resolve()
+    
     if 'qm9' in cfg.dataset:
         batch_size = cfg.batch_size
         num_workers = cfg.num_workers
@@ -35,16 +36,18 @@ def retrieve_dataloaders(cfg):
                                          num_workers=num_workers,
                                          collate_fn=preprocess.collate_fn)
                              for split, dataset in datasets.items()}
+        
     elif 'jump' in cfg.dataset:
         import build_jump_dataset       
         from configs.datasets_config import get_dataset_info
         if cfg.data_file is None:
-            if cfg.remove_h:
-                data_file = '/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_no_h.npy' #TODO : put right file
+            file_path = io_path / "data" / "jump" 
+            if cfg.remove_h: 
+                data_file = str(file_path / "charac_30_no_h.npy") 
             else:
-                data_file = '/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy'
+                data_file = str(file_path / "charac_30_h.npy") 
         else:
-            data_file = cfg.data_file
+            data_file = str(io_path / cfg.data_file)
         batch_size = cfg.batch_size
         batch_size = cfg.batch_size
         num_workers = cfg.num_workers

@@ -207,7 +207,7 @@ geom_no_h = {
     'with_h': False}
 
 
-def get_dataset_info(dataset_name, remove_h):
+def get_dataset_info(dataset_name, remove_h, resume=None):
     if dataset_name == 'qm9':
         if not remove_h:
             return qm9_with_h
@@ -225,7 +225,9 @@ def get_dataset_info(dataset_name, remove_h):
             raise Exception('Missing config for %s without hydrogens' % dataset_name)
     elif dataset_name == 'jump':
         if not remove_h:
-            return jump_with_h
+            if resume is not None: #TODO : retrocompatibility
+                return jump_with_h
+            return jump_with_h_new
         else:   
             return jump
     else:

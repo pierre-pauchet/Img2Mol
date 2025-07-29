@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"  # Set CUDA_VISIBLE_DEVICES to use GPU 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 
 
 try:
     from rdkit import Chem
@@ -29,7 +29,7 @@ import torchinfo
 import pickle
 from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings, profiler
 from train_test import train_epoch, test, analyze_and_save
-
+from pathlib import Path 
 
 parser = argparse.ArgumentParser(description="E3Diffusion")
 parser.add_argument("--exp_name", type=str, default="")
@@ -100,8 +100,8 @@ parser.add_argument('--sin_embedding', type=eval, default=False,
 parser.add_argument('--ode_regularization', type=float, default=1e-3)
 parser.add_argument('--dataset', type=str, default='jump',
                     help='qm9 | qm9_second_half (train only on the last 50K samples of the training dataset)')
-parser.add_argument('--datadir', type=str, default='data/jump_data',
-                    help='qm9 directory')
+parser.add_argument('--datadir', type=str, default='/import/pr_iktos/pierre/CondGeoLDM',
+                    help='absolute path to root of data folder & output folder')
 parser.add_argument('--filter_n_atoms', type=int, default=None,
                     help='When set to an integer value, QM9 will only contain molecules of that amount of atoms')
 parser.add_argument('--dequantization', type=str, default='argmax_variational',
@@ -144,7 +144,7 @@ parser.add_argument("--conditioning", nargs='+', default=[],
                     help='arguments : homo | lumo | alpha | gap | mu | Cv' )
 parser.add_argument('--conditioning_mode', type=str, default='original',
                     help='original | naive | attention | other') #maybe i should default to a no cond mode
-parser.add_argument('--data_file', type=str, default='/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy')
+parser.add_argument('--data_file', type=str, default='data/jump/charac_30_h.npy')
 parser.add_argument('--filter_molecule_size', type=int, default=None)
 parser.add_argument('--sequential', type=bool, default=False)
 parser.add_argument('--percent_train_ds', type=float, default=None,
@@ -152,13 +152,16 @@ parser.add_argument('--percent_train_ds', type=float, default=None,
 parser.add_argument('--viability_metrics_epochs', type=int, default=None,
                     help='Frequence of computation of metrics. Defaults to test_epochs')
 
-args = parser.parse_args()
+args, unknown = parser.parse_known_args()
 
+# flexible path structure 
+exec_path = Path(__file__).resolve().parent
+io_path = Path(args.datadir)
 
 if args.resume is not None:
     resume = args.resume
-    
-    with open(join(args.resume, "args.pickle"), "rb") as f:
+    resume_path = Path(args.resume)
+    with open(resume_path / "args.pickle", "rb") as f:
         args = pickle.load(f)
     exp_name = args.exp_name + "_resume"
     start_epoch = args.start_epoch
@@ -181,12 +184,13 @@ if args.resume is not None:
         args.aggregation_method = aggregation_method
 
 
-dataset_info = get_dataset_info(args.dataset, args.remove_h)
+dataset_info = get_dataset_info(args.dataset, args.remove_h, args.resume)
 
 atom_encoder = dataset_info["atom_encoder"]
 atom_decoder = dataset_info["atom_decoder"]
 
 # args, unparsed_args = parser.parse_known_args()
+os.environ['WANDB_DIR'] = str(io_path / "wandb")
 args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
@@ -196,8 +200,6 @@ if args.viability_metrics_epochs is None:
     args.viability_metrics_epochs = args.test_epochs
 
 dtype = torch.float32
-
-
 
 utils.create_folders(args)
 
@@ -275,8 +277,8 @@ def check_mask_correct(variables, node_mask):
 def main():
     print(args)
     if args.resume is not None:
-        flow_state_dict = torch.load(join(args.resume, "generative_model_ema.npy"))
-        optim_state_dict = torch.load(join(args.resume, "flow.npy"))
+        flow_state_dict = torch.load(resume_path / "generative_model_ema.npy")
+        optim_state_dict = torch.load(resume_path / "flow.npy")
         model.load_state_dict(flow_state_dict)
         optim.load_state_dict(optim_state_dict)
 
@@ -312,6 +314,7 @@ def main():
     #                 nodes_dist=nodes_dist, dataset_info=dataset_info,
     #                 gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders)
     # print("Done profiling")
+
     
     for epoch in range(args.start_epoch, args.n_epochs):
         start_epoch = time.time()
@@ -342,11 +345,11 @@ def main():
                 # save best model over previous best
                 if args.save_model:
                     args.current_epoch = epoch + 1
-                    utils.save_model(optim, 'outputs/%s/flow.npy' % args.exp_name)
-                    utils.save_model(model, 'outputs/%s/generative_model.npy' % args.exp_name)
+                    utils.save_model(optim, io_path / 'outputs/%s/flow.npy' % args.exp_name)
+                    utils.save_model(model, io_path / 'outputs/%s/generative_model.npy' % args.exp_name)
                     if args.ema_decay > 0:
-                        utils.save_model(model_ema, 'outputs/%s/generative_model_ema.npy' % args.exp_name)
-                    with open('outputs/%s/args.pickle' % args.exp_name, 'wb') as f:
+                        utils.save_model(model_ema, io_path / 'outputs/%s/generative_model_ema.npy' % args.exp_name)
+                    with open(io_path / 'outputs/%s/args.pickle' % args.exp_name, 'wb') as f:
                         pickle.dump(args, f)
                         
             #save current model

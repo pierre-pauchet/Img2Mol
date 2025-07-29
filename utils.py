@@ -2,11 +2,14 @@ import numpy as np
 import getpass
 import os
 import torch
+from pathlib import Path
+
 
 # Folders
 def create_folders(args):
+    io_path = Path(args.datadir).resolve()
     try:
-        os.makedirs('outputs')
+        os.makedirs(io_path / 'outputs')
     except OSError:
         pass
 

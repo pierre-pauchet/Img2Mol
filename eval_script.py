@@ -10,6 +10,7 @@ import argparse
 import pickle
 import utils
 import time
+from pathlib import Path
 
 from equivariant_diffusion.utils import assert_correctly_masked
 from qm9.sampling import sample_chain, sample
@@ -28,9 +29,9 @@ def check_mask_correct(variables, node_mask):
 
 def save_and_sample_chain(args, eval_args, device, flow, n_tries, n_nodes, dataset_info, 
                           sample_id=0, num_visualisations=10,):
-    
+    io_path = Path(args.datadir)
     for i in range(num_visualisations):
-        target_path = f"eval/chain{i}/"
+        target_path = io_path/ "eval"/ "chain{i}"
 
         one_hot, charges, x, node_mask = sample_chain(
             args, device, flow, n_tries, dataset_info, test_loaders=None
