@@ -20,7 +20,7 @@ qm9_conditional.sh
 figures/
 geom_drugs.sh
 wget-log
-pyproject.toml
+# pyproject.toml
 bugged_ids_during_3d_generation.npy
 requirements.txt
 data/jump/Embeddings_norm.npy
