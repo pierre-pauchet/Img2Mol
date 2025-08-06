@@ -161,15 +161,17 @@ io_path = Path(args.datadir)
 if args.resume is not None:
     resume = args.resume
     resume_path = Path(args.resume)
+    online = args.online
     with open(resume_path / "args.pickle", "rb") as f:
         args = pickle.load(f)
     exp_name = args.exp_name + "_resume"
     start_epoch = args.start_epoch
+    
     wandb_usr = args.wandb_usr
     normalization_factor = args.normalization_factor
     aggregation_method = args.aggregation_method
 
-
+    assert online == args.online, "Online mode should be the same as the one used for resuming"
     args.resume = resume
     args.break_train_epoch = False
 
