@@ -165,6 +165,7 @@ if args.resume is not None:
     resume = args.resume
     resume_path = Path(args.resume)
     online = args.online
+    data_file = args.data_file
     print(online)
     with open(resume_path / "args.pickle", "rb") as f:
         args = pickle.load(f)
@@ -177,7 +178,7 @@ if args.resume is not None:
 
     args.resume = resume
     args.break_train_epoch = False
-
+    args.data_file = data_file
     args.batch_size = 32
     args.exp_name = exp_name
     args.start_epoch = start_epoch
