@@ -165,7 +165,7 @@ if args.resume is not None:
     resume = args.resume
     resume_path = Path(args.resume)
     online = args.online
-    data_file = args.data_file
+    data_file = str(io_path / args.data_file)
     print(online)
     with open(resume_path / "args.pickle", "rb") as f:
         args = pickle.load(f)
