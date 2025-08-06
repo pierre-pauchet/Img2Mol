@@ -184,8 +184,8 @@ class EquivariantBlock(nn.Module):
         if node_mask is not None:
             h = h * node_mask
         # skip connections 
-        h = h + h0 
-        x = x + x0
+        # h = h + h0 
+        # x = x + x0
         return h, x
 
 

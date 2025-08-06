@@ -1839,7 +1839,7 @@ wheels = [
 
 [[package]]
 name = "scikit-fingerprints"
-version = "1.15.0"
+version = "1.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "descriptastorus" },
@@ -1855,9 +1855,9 @@ dependencies = [
     { name = "scipy" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/9e/cc40e952402c39327148c8f93e8cfe0ea6f58d524fe11c57c2a2a5e3e869/scikit_fingerprints-1.15.0.tar.gz", hash = "sha256:8cb0a7cfa9b171dbf8ef2b3e4e9b83f49ea249af9ad0e5a2a72d24d17c9ebbfb", size = 203004, upload_time = "2025-03-12T14:38:29.155Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/d3/6a8182318599fde15bd4786ab30a117ff4e07fdb67adcfa75d5deb47d238/scikit_fingerprints-1.16.0.tar.gz", hash = "sha256:70ef0e08f356806f88c6221b47ed202e3fc22e2326f91a5318d67f01f8a2bb33", size = 224811, upload_time = "2025-05-31T20:51:15.694Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/63/1809183d9c67cb5d6d571741840fc6c7298ed40e1ad5615bc1545537b6ed/scikit_fingerprints-1.15.0-py3-none-any.whl", hash = "sha256:032612dc9d69c95e4f0a8bacf4ba1b8eea8ad4d374ff19da20554f74ee5db98c", size = 357033, upload_time = "2025-03-12T14:38:27.756Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/92/767a8f0ebef2e913e84da72266aeb07fd6742008f0d7a85e779a44432025/scikit_fingerprints-1.16.0-py3-none-any.whl", hash = "sha256:45c2acc119c80e34c61abf5aed0e1f8f1b2a77f6ca9f047bf0c624e05b85f12e", size = 391625, upload_time = "2025-05-31T20:51:14.216Z" },
 ]
 
 [[package]]
@@ -2532,7 +2532,7 @@ requires-dist = [
     { name = "rdkit", specifier = ">=2024.9.5" },
     { name = "requests", specifier = "==2.28.1" },
     { name = "ruff", specifier = ">=0.11.11" },
-    { name = "scikit-fingerprints", specifier = "==1.15" },
+    { name = "scikit-fingerprints", specifier = ">=1.16" },
     { name = "scipy", specifier = "==1.9.1" },
     { name = "sentry-sdk", specifier = "==1.9.0" },
     { name = "setuptools", specifier = "==65.4.0" },

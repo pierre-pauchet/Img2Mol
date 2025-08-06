@@ -299,10 +299,5 @@ def build_xae_molecule(positions, atom_types, dataset_info):
     return X, A, E
 
 if __name__ == '__main__':
-    smiles_mol = 'C1CCC1'
-    print("Smiles mol %s" % smiles_mol)
-    chem_mol = Chem.MolFromSmiles(smiles_mol)
-    block_mol = Chem.MolToMolBlock(chem_mol)
-    print("Block mol:")
-    print(block_mol)
+    retrieve_qm9_smiles()
 

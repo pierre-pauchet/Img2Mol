@@ -6,6 +6,7 @@ import random
 import matplotlib
 import imageio
 import tqdm
+from pathlib import Path
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -28,7 +29,7 @@ def save_xyz_file(path, one_hot, charges, positions, dataset_info, sample_id=0, 
 
     for batch_i in range(one_hot.size(0)):
         
-        f = open(path + name + '_'+ '%02d' % (sample_id+1) +'_' + "%03d.txt" % (batch_i), "w")
+        f = open(Path(path) / f"{name}_{sample_id+1:02d}_{batch_i:03d}.txt", "w")
         f.write("%d\n\n" % atomsxmol[batch_i])
         atoms = torch.argmax(one_hot[batch_i], dim=1)
         n_atoms = int(atomsxmol[batch_i])

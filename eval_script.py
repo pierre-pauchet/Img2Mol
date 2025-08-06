@@ -3,7 +3,9 @@ import numpy as np
 from os.path import join
 import pandas as pd
 import skfp
-# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+import tqdm 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 import torch
 import argparse
@@ -11,6 +13,7 @@ import pickle
 import utils
 import time
 from pathlib import Path
+import torch.multiprocessing as mp
 
 from equivariant_diffusion.utils import assert_correctly_masked
 from qm9.sampling import sample_chain, sample
@@ -19,8 +22,8 @@ from qm9.models import get_latent_diffusion
 from configs.datasets_config import get_dataset_info
 from qm9 import dataset, losses
 from metrics.viability import analyze_stability_for_molecules, check_stability
-from metrics.fidelity import rdkit_mols_to_fingerprints, compute_self_similarity, compute_retrieval, \
-                                read_fingerprints_file, compute_self_similarity_joblib
+from metrics.fidelity import rdkit_mols_to_fingerprints, compute_self_similarity, compute_top_k_retrieval, \
+                                read_fingerprints_file, compute_self_similarity_joblib, save_fingerprints_file
 
 def check_mask_correct(variables, node_mask):
     for variable in variables:
@@ -38,7 +41,7 @@ def save_and_sample_chain(args, eval_args, device, flow, n_tries, n_nodes, datas
         )
         for sample_id in range(one_hot.size(0)):
             vis.save_xyz_file(
-                join(eval_args.model_path, f"{target_path}"),
+                Path(eval_args.datadir) / eval_args.model_path/ f"{target_path}",
                 one_hot[sample_id],
                 charges[sample_id],
                 x[sample_id],
@@ -78,25 +81,46 @@ def sample_different_sizes(
     dataset_info,
     n_samples=10,
     save=False,
+    batch_size=150
 ):
     nodesxsample = nodes_dist.sample(n_samples)
 
-    one_hot, charges, x, node_mask = sample(
-        args, device, generative_model, dataset_info, nodesxsample=nodesxsample
-    )
+    # one_hot, charges, x, node_mask = sample(
+    #     args, device, generative_model, dataset_info, nodesxsample=nodesxsample
+    # )
+    # all_one_hot = []
+    # all_charges = []
+    # all_x = []
+    # all_node_mask = []
 
-    if save:
-        vis.save_xyz_file(
-            join(eval_args.model_path, "eval/molecules/"),
-            one_hot,
-            charges,
-            x,
-            sample_id=0,
-            name="molecule",
-            dataset_info=dataset_info,
-            node_mask=node_mask,
+    for i in tqdm.tqdm(range(0, len(nodesxsample), batch_size)):
+        one_hot, charges, x, node_mask = sample(
+            args, device, generative_model, dataset_info, nodesxsample=nodesxsample[i:i+batch_size],
+            random_idx=False
         )
-    return one_hot, charges, x, node_mask
+        # all_one_hot.append(one_hot)
+        # all_charges.append(charges)
+        # all_x.append(x)
+        # all_node_mask.append(node_mask)
+        if save:
+            vis.save_xyz_file(
+                str(Path(eval_args.datadir) / eval_args.save_path / "eval" / "molecules"),
+                one_hot,
+                charges,
+                x,
+                sample_id=i,
+                name="molecule",
+                dataset_info=dataset_info,
+                node_mask=node_mask,
+            )
+        # Concatenate all batches into single tensors
+    # all_one_hot = torch.cat(all_one_hot, dim=0)
+    # all_charges = torch.cat(all_charges, dim=0)
+    # all_x = torch.cat(all_x, dim=0)
+    # all_node_mask = torch.cat(all_node_mask, dim=0)
+    # print(all_one_hot.shape)
+
+    # return all_one_hot, all_charges, all_x, all_node_mask
 
 
 def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*n_samples samples
@@ -109,13 +133,33 @@ def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*
     n_samples=10,
     n_tries=50,
     save=False,
+    batch_size = 100,
 ):
-    assert n_tries > n_samples
+    io_path = Path(eval_args.datadir)
     
+    assert n_tries > n_samples
     nodesxsample = nodes_dist.sample(n_tries) 
-    one_hot, charges, x, node_mask = sample(
-        args, device, flow, dataset_info, nodesxsample=nodesxsample
-    )
+    
+    all_one_hot = []
+    all_charges = []
+    all_x = []
+    all_node_mask = []
+
+    for i in tqdm.tqdm(range(0, len(nodesxsample), batch_size)):
+        one_hot, charges, x, node_mask = sample(
+            args, device, flow, dataset_info, nodesxsample=nodesxsample[i:i+batch_size]
+        )
+        all_one_hot.append(one_hot)
+        all_charges.append(charges)
+        all_x.append(x)
+        all_node_mask.append(node_mask)
+
+    # Concatenate all batches into single tensors
+    all_one_hot = torch.cat(all_one_hot, dim=0)
+    all_charges = torch.cat(all_charges, dim=0)
+    all_x = torch.cat(all_x, dim=0)
+    all_node_mask = torch.cat(all_node_mask, dim=0)
+            
 
     counter = 0
     stable_mol_list = []
@@ -135,7 +179,7 @@ def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*
                 print("Found stable mol.")
                 if save:
                     vis.save_xyz_file(
-                        join(eval_args.model_path, "eval/molecules/"),
+                        str(io_path / eval_args.model_path / "eval/molecules/"),
                         one_hot[i : i + 1],
                         charges[i : i + 1],
                         x[i : i + 1],
@@ -144,6 +188,7 @@ def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*
                         dataset_info=dataset_info,
                         node_mask=node_mask[i : i + 1],
                     )
+                    print('Saved mols at ', io_path / eval_args.model_path / "eval/molecules/" )
             stable_mol_list.append(
                 (
                     one_hot[i : i + 1],
@@ -195,24 +240,30 @@ def main():
     parser.add_argument(
         "--n_nodes",type=int, default=44 ,help="Size of fixed-sized generation")
     parser.add_argument(
-        "--data_file",type=str, default="/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy",
+        "--data_file",type=str, default="data/jump/charac_30_h.npy",
         help="Conditioning type: geom, jump, or both")
-    parser.add_argument('--train_fp_file', type=str, default="./CondGeoLDM/data/fingerprints_data/jump_fingerprints.npy",
-                        help='Path to the embeddings data directory')
-    
-    parser.add_argument("--model_path", type=str, default="CondGeoLDM/outputs")
+    parser.add_argument('--train_fp_file', type=str, default="data/fingerprints_data/jump_fingerprints.npy",
+                        help='Relative path to the embeddings data directory')
+    parser.add_argument("--datadir", type=str, default="/import/pr_iktos/pierre/CondGeoLDM")
+    parser.add_argument("--model_path", type=str, default="outputs/geom_pretrained")
     parser.add_argument("--stable_only", action="store_true")
     parser.add_argument("--visualise_chain", action="store_true")
     parser.add_argument("--save_samples", action="store_true")
-
+    parser.add_argument("--save_path", type=str, default="sampled_mols/debug")
+    print("CUDA_VISIBLE_DEVICES =", os.environ.get("CUDA_VISIBLE_DEVICES"))
+    
     # Parse the arguments
     eval_args, _ = parser.parse_known_args()
     print(eval_args)
     assert eval_args.model_path is not None
-
-    with open(join(eval_args.model_path, "args.pickle"), "rb") as f:
+    io_path = Path(eval_args.datadir)
+    
+    with open(io_path / eval_args.model_path /  "args.pickle", "rb") as f:
         args = pickle.load(f)
-
+    print("CUDA available:", torch.cuda.is_available())
+    print("Number of GPUs:", torch.cuda.device_count())
+    for i in range(torch.cuda.device_count()):
+        print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if args.cuda else "cpu")
     args.device = device
@@ -233,7 +284,7 @@ def main():
     flow.to(device)
 
     fn = "generative_model_ema.npy" if args.ema_decay > 0 else "generative_model.npy"
-    flow_state_dict = torch.load(join(eval_args.model_path, fn), map_location=device)
+    flow_state_dict = torch.load(io_path / eval_args.model_path / fn, map_location=device)
     flow.load_state_dict(flow_state_dict)
 
     
@@ -268,7 +319,7 @@ def main():
     else:
         print("Visualizing molecules.")
         vis.visualize(
-            join(eval_args.model_path, "eval/molecules/"),
+            str(io_path / eval_args.model_path / "eval" / "molecules" ),
             dataset_info,
             max_num=100,
             spheres_3d=True,
@@ -302,32 +353,27 @@ def main():
     # 4. Compute Fidelity metrics
     
     fp = rdkit_mols_to_fingerprints(rdkit_mols)
-    train_fp = read_fingerprints_file("./data/fingerprints_data/jump_fingerprints.npy")
+    train_fp = read_fingerprints_file("./data/fingerprints_data/geom_fingerprints.npy")
                                       
     # self_sim = compute_self_similarity(fp)
-    # histogram, retrieval = compute_retrieval(fp, train_fp)
+    # histogram, retrieval = compute_top_k_retrieval(fp, train_fp)
     
     # print("Self-similarity: ",self_sim)
     # print("Retrieval: ", retrieval)
     subset = train_fp[:50000]
 
-    # # Mesure du temps pour la version normale
-    start_time = time.time()
-    sim1 = compute_self_similarity(subset)
-    end_time = time.time()
-    print(f"compute_self_similarity took {end_time - start_time:.2f} seconds")
+    # # # Mesure du temps pour la version normale
+    # start_time = time.time()
+    # sim1 = compute_self_similarity(subset)
+    # end_time = time.time()
+    # print(f"compute_self_similarity took {end_time - start_time:.2f} seconds")
 
     # Version parallélisée avec joblib
     start_time = time.time()
-    sim2 = compute_self_similarity_joblib(subset)
+    sim2, _, _ = compute_top_k_retrieval(fp, subset)
+    print(sim2)
     end_time = time.time()
     print(f"compute_self_similarity_joblib took {end_time - start_time:.2f} seconds")
-
-    # Vérification de cohérence
-    if np.allclose(sim1, sim2, atol=1e-3):
-        print("Résultats cohérents entre les deux implémentations.")
-    else:
-        print("Attention : les résultats diffèrent.")
-    
+    save_fingerprints_file(fp, str(io_path / 'data/fingerprints_data/geom'))
 if __name__ == "__main__":
     main()

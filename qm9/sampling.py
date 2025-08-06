@@ -182,7 +182,8 @@ def sample(args, device, generative_model, dataset_info,
                 phenotypes = all_phenotypes[random_embedding_idx]
         else:
             phenotypes = all_phenotypes[:batch_size]
-    else: 
+            # phenotypes = all_phenotypes[12].repeat(batch_size, 1).to(device)  
+    else:
         phenotypes = None
     
     if args.probabilistic_model == 'diffusion':

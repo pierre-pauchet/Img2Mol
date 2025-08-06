@@ -83,7 +83,7 @@ dependencies = [
     "rdkit>=2024.9.5",
     "requests==2.28.1",
     "ruff>=0.11.11",
-    "scikit-fingerprints==1.15",
+    "scikit-fingerprints>=1.16",
     "scipy==1.9.1",
     "sentry-sdk==1.9.0",
     "setuptools==65.4.0",

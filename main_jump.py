@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0,2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 
 
 try:
     from rdkit import Chem
@@ -345,11 +345,11 @@ def main():
                 # save best model over previous best
                 if args.save_model:
                     args.current_epoch = epoch + 1
-                    utils.save_model(optim, io_path / 'outputs/%s/flow.npy' % args.exp_name)
-                    utils.save_model(model, io_path / 'outputs/%s/generative_model.npy' % args.exp_name)
+                    utils.save_model(optim, io_path / 'outputs' /{args.exp_name}/ 'flow.npy')
+                    utils.save_model(model, io_path / 'outputs' /{args.exp_name} / 'generative_model.npy' )
                     if args.ema_decay > 0:
-                        utils.save_model(model_ema, io_path / 'outputs/%s/generative_model_ema.npy' % args.exp_name)
-                    with open(io_path / 'outputs/%s/args.pickle' % args.exp_name, 'wb') as f:
+                        utils.save_model(model_ema, io_path / 'outputs' / {args.exp_name} / 'generative_model_ema.npy')
+                    with open(io_path / 'outputs' /{args.exp_name}/ 'args.pickle' , 'wb') as f:
                         pickle.dump(args, f)
                         
             #save current model
