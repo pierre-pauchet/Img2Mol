@@ -15,7 +15,7 @@ from configs.datasets_config import jump
 import copy
 import utils
 import argparse
-import wandb
+# import wandb
 from configs.datasets_config import get_dataset_info
 from os.path import join
 from qm9 import dataset
@@ -109,7 +109,7 @@ parser.add_argument('--dequantization', type=str, default='argmax_variational',
 parser.add_argument('--n_report_steps', type=int, default=50)
 parser.add_argument('--wandb_usr', type=str)
 parser.add_argument('--no_wandb', action='store_true', default=False, help='Disable wandb')
-parser.add_argument('--online', type=bool, default=True, help='True = wandb online -- False = wandb offline')
+parser.add_argument('--online', action='store_true', default=False, help='True = wandb online -- False = wandb offline')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--save_model', type=eval, default=True, help='save model')
@@ -158,10 +158,14 @@ args, unknown = parser.parse_known_args()
 exec_path = Path(__file__).resolve().parent
 io_path = Path(args.datadir)
 
+os.environ['WANDB_DIR'] = str(io_path)
+import wandb
+
 if args.resume is not None:
     resume = args.resume
     resume_path = Path(args.resume)
     online = args.online
+    print(online)
     with open(resume_path / "args.pickle", "rb") as f:
         args = pickle.load(f)
     exp_name = args.exp_name + "_resume"
@@ -171,7 +175,6 @@ if args.resume is not None:
     normalization_factor = args.normalization_factor
     aggregation_method = args.aggregation_method
 
-    assert online == args.online, "Online mode should be the same as the one used for resuming"
     args.resume = resume
     args.break_train_epoch = False
 
@@ -192,7 +195,6 @@ atom_encoder = dataset_info["atom_encoder"]
 atom_decoder = dataset_info["atom_decoder"]
 
 # args, unparsed_args = parser.parse_known_args()
-os.environ['WANDB_DIR'] = str(io_path / "wandb")
 args.wandb_usr = utils.get_wandb_username(args.wandb_usr)
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
@@ -209,11 +211,12 @@ utils.create_folders(args)
 if args.no_wandb:
     mode = "disabled"
 else:
-    mode = 'online' if args.online else 'offline'
+    mode = 'online' if online else 'offline'
 kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion', 'config': vars(args),
           'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': mode}
 wandb.init(**kwargs)
 wandb.save("*.txt")
+print("after init:", wandb.run.dir)
 
 
 # Build Jump Dataset
@@ -277,12 +280,12 @@ def check_mask_correct(variables, node_mask):
 
 
 def main():
-    print(args)
     if args.resume is not None:
         flow_state_dict = torch.load(resume_path / "generative_model_ema.npy")
         optim_state_dict = torch.load(resume_path / "flow.npy")
         model.load_state_dict(flow_state_dict)
         optim.load_state_dict(optim_state_dict)
+
 
     # Initialize dataparallel if enabled and possible.
     if args.dp and torch.cuda.device_count() > 1:
