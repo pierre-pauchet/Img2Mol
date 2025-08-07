@@ -365,14 +365,17 @@ def main():
                     with open(io_path / 'outputs' /{args.exp_name}/ 'args.pickle' , 'wb') as f:
                         pickle.dump(args, f)
                         
-            #save current model
-            # if args.save_model:
-            #     utils.save_model(optim, 'outputs/%s/optim_%d.npy' % (args.exp_name, epoch))
-            #     utils.save_model(model, 'outputs/%s/generative_model_%d.npy' % (args.exp_name, epoch))
-            #     if args.ema_decay > 0:
-            #         utils.save_model(model_ema, 'outputs/%s/generative_model_ema_%d.npy' % (args.exp_name, epoch))
-            #     with open('outputs/%s/args_%d.pickle' % (args.exp_name, epoch), 'wb') as f:
-            #         pickle.dump(args, f)
+            # save current model
+            if args.save_model:
+                epoch_folder = io_path / 'outputs' / args.exp_name / f'epoch_{epoch}'
+                epoch_folder.mkdir(parents=True, exist_ok=True)
+
+                utils.save_model(optim, epoch_folder / 'optim.npy')
+                utils.save_model(model, epoch_folder / 'generative_model.npy')
+                if args.ema_decay > 0:
+                    utils.save_model(model_ema, epoch_folder / 'generative_model_ema.npy')
+                with open(epoch_folder / 'args.pickle', 'wb') as f:
+                    pickle.dump(args, f)
             print("Val loss: %.4f" % (nll_val))
             print("Best val loss: %.4f" % best_nll_val)
             wandb.log({"Val loss ": nll_val, "Epoch": epoch}, commit=True)
