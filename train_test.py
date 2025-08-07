@@ -89,14 +89,17 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
             print(f'Sampling took {time.time() - start:.2f} seconds')
             examples = data
             wandb.log({"train_sample": wandb.Table(data=[[str(examples)]], columns=["Sample"])})
-
             base_output_path = Path(args.datadir) / "outputs" / args.exp_name / f"epoch_{epoch}_{i}"
             print("base_output", base_output_path)
+            print("vis")
             vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=wandb)
+            print("vis_chain")
+            
             vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=wandb)
             if len(args.conditioning) > 0:
                 vis.visualize_chain("outputs/%s/epoch_%d/conditional/" % (args.exp_name, epoch), dataset_info,
                                     wandb=wandb, mode="conditional")
+        print("log")
         wandb.log({"Batch NLL": nll.item()}, commit=True)
         wandb.log({"GradNorm": grad_norm}, commit=True)
         prof.step() if prof is not None else None
@@ -109,6 +112,8 @@ def check_mask_correct(variables, node_mask):
     for i, variable in enumerate(variables):
         if len(variable) > 0:
             assert_correctly_masked(variable, node_mask)
+
+
 
 
 def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_dist, partition="Test"):
