@@ -178,6 +178,7 @@ if args.resume is not None:
         if k in d2 and d1[k] != d2[k]:
             print(f"{k}: {d1[k]!r} -> {d2[k]!r}")
     exp_name = args.exp_name + "_resume"
+    args.exp_name = exp_name
     start_epoch = args.start_epoch
     # wandb_usr = args.wandb_usr
     normalization_factor = args.normalization_factor
@@ -187,7 +188,6 @@ if args.resume is not None:
     # args.break_train_epoch = False
     # args.data_file = data_file
     # args.batch_size = 32
-    # args.exp_name = exp_name
     # args.start_epoch = start_epoch
     # args.wandb_usr = wandb_usr
     # Careful with this -->
