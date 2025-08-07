@@ -92,10 +92,10 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
             base_output_path = Path(args.datadir) / "outputs" / args.exp_name / f"epoch_{epoch}_{i}"
             print("base_output", base_output_path)
             print("vis")
-            vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=wandb)
+            vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=None)
             print("vis_chain")
             
-            vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=wandb)
+            vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=None)
             if len(args.conditioning) > 0:
                 vis.visualize_chain("outputs/%s/epoch_%d/conditional/" % (args.exp_name, epoch), dataset_info,
                                     wandb=wandb, mode="conditional")
