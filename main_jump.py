@@ -10,14 +10,13 @@ try:
     from rdkit import Chem
 except ModuleNotFoundError:
     pass
-import os
 from configs.datasets_config import jump
 import copy
 import utils
 import argparse
+import sys
 # import wandb
 from configs.datasets_config import get_dataset_info
-from os.path import join
 from qm9 import dataset
 from qm9.models import get_optim, get_autoencoder, get_latent_diffusion
 from equivariant_diffusion import en_diffusion
@@ -25,7 +24,6 @@ from equivariant_diffusion.utils import assert_correctly_masked
 from equivariant_diffusion import utils as flow_utils
 import torch
 import time
-import torchinfo
 import pickle
 from qm9.utils import prepare_context, compute_mean_mad, prepare_embeddings, profiler
 from train_test import train_epoch, test, analyze_and_save
@@ -109,7 +107,8 @@ parser.add_argument('--dequantization', type=str, default='argmax_variational',
 parser.add_argument('--n_report_steps', type=int, default=50)
 parser.add_argument('--wandb_usr', type=str)
 parser.add_argument('--no_wandb', action='store_true', default=False, help='Disable wandb')
-parser.add_argument('--online', action='store_true', default=False, help='True = wandb online -- False = wandb offline')
+parser.add_argument('--online', action='store_true', default=False,
+                    help='True = wandb online -- False = wandb offline')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--save_model', type=eval, default=True, help='save model')
@@ -153,6 +152,7 @@ parser.add_argument('--viability_metrics_epochs', type=int, default=None,
                     help='Frequence of computation of metrics. Defaults to test_epochs')
 
 args, unknown = parser.parse_known_args()
+overridden_keys = utils.get_overridden_keys(sys.argv)
 
 # flexible path structure 
 exec_path = Path(__file__).resolve().parent
@@ -161,6 +161,7 @@ io_path = Path(args.datadir)
 os.environ['WANDB_DIR'] = str(io_path)
 import wandb
 
+print(args)
 if args.resume is not None:
     resume = args.resume
     resume_path = Path(args.resume)
@@ -168,21 +169,27 @@ if args.resume is not None:
     data_file = str(io_path / args.data_file)
     print(online)
     with open(resume_path / "args.pickle", "rb") as f:
-        args = pickle.load(f)
+        old_args = pickle.load(f)
+    print(overridden_keys)
+
+    args = utils.merge_args(old_args, args, overridden_keys)
+    d1, d2 = vars(old_args), vars(args)
+    for k in d1:
+        if k in d2 and d1[k] != d2[k]:
+            print(f"{k}: {d1[k]!r} -> {d2[k]!r}")
     exp_name = args.exp_name + "_resume"
     start_epoch = args.start_epoch
-    
-    wandb_usr = args.wandb_usr
+    # wandb_usr = args.wandb_usr
     normalization_factor = args.normalization_factor
     aggregation_method = args.aggregation_method
 
-    args.resume = resume
-    args.break_train_epoch = False
-    args.data_file = data_file
-    args.batch_size = 32
-    args.exp_name = exp_name
-    args.start_epoch = start_epoch
-    args.wandb_usr = wandb_usr
+    # args.resume = resume
+    # args.break_train_epoch = False
+    # args.data_file = data_file
+    # args.batch_size = 32
+    # args.exp_name = exp_name
+    # args.start_epoch = start_epoch
+    # args.wandb_usr = wandb_usr
     # Careful with this -->
     if not hasattr(args, "normalization_factor"):
         args.normalization_factor = normalization_factor
