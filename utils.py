@@ -1,9 +1,8 @@
 import numpy as np
-import getpass
+import argparse
 import os
 import torch
 from pathlib import Path
-
 
 # Folders
 def create_folders(args):
@@ -134,10 +133,36 @@ def random_rotation(x):
 
     return x.contiguous()
 
+# Get overridden keys from command line arguments
+def get_overridden_keys(argv):
+    overridden = set()
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg.startswith("--"):
+            if "=" in arg:
+                key = arg[2:].split("=")[0]
+                overridden.add(key)
+            else:
+                key = arg[2:]
+                overridden.add(key)
+                i += 1  # Skip next element (value)
+        i += 1
+    return overridden
+
+
+def merge_args(old_args, new_args, overridden_keys):
+
+    merged = vars(old_args).copy()
+    for key in vars(new_args):
+        if key in overridden_keys or merged.get(key) is None:
+            merged[key] = getattr(new_args, key)
+    return argparse.Namespace(**merged)
 
 # Other utilities
 def get_wandb_username(username):
         return username
+
 
 
 if __name__ == "__main__":
