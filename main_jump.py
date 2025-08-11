@@ -357,12 +357,14 @@ def main():
 
                 # save best model over previous best
                 if args.save_model:
+                    global_folder = io_path / 'outputs' / f'{args.exp_name}' / f'epoch_{epoch}'
+                    global_folder.mkdir(parents=True, exist_ok=True)
                     args.current_epoch = epoch + 1
-                    utils.save_model(optim, io_path / 'outputs' / f'{args.exp_name}' / 'flow.npy')
-                    utils.save_model(model, io_path / 'outputs' / f'{args.exp_name}' / 'generative_model.npy' )
+                    utils.save_model(optim, global_folder / 'flow.npy')
+                    utils.save_model(model, global_folder/ 'generative_model.npy' )
                     if args.ema_decay > 0:
-                        utils.save_model(model_ema, io_path / 'outputs' / {args.exp_name} / 'generative_model_ema.npy')
-                    with open(io_path / 'outputs' /f'{args.exp_name}' / 'args.pickle' , 'wb') as f:
+                        utils.save_model(model_ema, global_folder / 'generative_model_ema.npy')
+                    with open(global_folder / 'args.pickle' , 'wb') as f:
                         pickle.dump(args, f)
                         
             # save current model
