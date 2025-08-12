@@ -56,6 +56,7 @@ def postprocess_rdkit_mols(mols_list):
             valid_mols.append(largest_mol)
         except Exception as e:
             print(f"Error sanitizing molecule: {e}")
+            
     return valid_mols
 
 
@@ -221,33 +222,46 @@ def compute_stacked_histogram(similarities_list, labels, save_path, bins=100, ti
     plt.close()
     
     
-def compute_stacked_umap(fingerprints_list, labels, save_path, title='', n_neighbors=15, min_dist=0.1):
+def compute_stacked_umap(fingerprints_list, labels, save_path, title='', n_neighbors=15, min_dist=0.1, random_state=42):
     assert len(fingerprints_list) == len(labels), "Number of fingerprints lists must match number of labels"
-
+    
     # Concatenate and track indices
     all_fps = np.concatenate(fingerprints_list, axis=0)
     group_sizes = [len(fps) for fps in fingerprints_list]
     group_indices = np.cumsum([0] + group_sizes)
-
-    reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=min_dist, n_components=2, random_state=42)
+    
+    # Create group labels for each point
+    group_labels = []
+    for i, size in enumerate(group_sizes):
+        group_labels.extend([i] * size)
+    group_labels = np.array(group_labels)
+    
+    
+    # Apply UMAP without shuffling to maintain group correspondence
+    reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=min_dist, n_components=2, random_state=random_state)
     embedding = reducer.fit_transform(all_fps)
-
+    
+    # Get embedding bounds for consistent scaling
     x_min, x_max = embedding[:, 0].min(), embedding[:, 0].max()
     y_min, y_max = embedding[:, 1].min(), embedding[:, 1].max()
-
-    n = len(fingerprints_list)
-    fig, axes = plt.subplots(1 + (n-1)//3, n, figsize=(6 * n, 5), squeeze=False)
-    cmap = plt.get_cmap('tab20') if n > 10 else plt.get_cmap('tab10')
-
-     # Grid size
+    
+    # Grid configuration
     n = len(fingerprints_list)
     cols = 3
     rows = math.ceil(n / cols)
-
+    
+    # Create subplots
     fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 5 * rows))
-    axes = axes.flatten()
+    if rows == 1 and cols == 1:
+        axes = [axes]
+    elif rows == 1 or cols == 1:
+        axes = axes.flatten()
+    else:
+        axes = axes.flatten()
+    
     cmap = plt.get_cmap('tab20') if n > 10 else plt.get_cmap('tab10')
-
+    
+    # Plot each group
     for i in range(rows * cols):
         ax = axes[i]
         if i < n:
@@ -257,26 +271,125 @@ def compute_stacked_umap(fingerprints_list, labels, save_path, title='', n_neigh
                 embedding[start:end, 1],
                 s=10,
                 color=cmap(i),
-                alpha=0.7
+                alpha=0.7,
+                label=labels[i]
             )
-            ax.set_title(labels[i])
+            ax.set_title(labels[i], fontsize=12)
             ax.set_xlabel('UMAP-1')
             ax.set_ylabel('UMAP-2')
-            ax.set_xlim(x_min, x_max)
-            ax.set_ylim(y_min, y_max)
+            ax.set_xlim(x_min - 0.1 * (x_max - x_min), x_max + 0.1 * (x_max - x_min))
+            ax.set_ylim(y_min - 0.1 * (y_max - y_min), y_max + 0.1 * (y_max - y_min))
             ax.grid(alpha=0.3)
         else:
-            ax.axis('off')  # Empty subplot
-    # Super titre unique
-    fig.suptitle(title, fontsize=14)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # la place pour le suptitle
-    plt.savefig(save_path, dpi=300)
+            ax.axis('off') 
+    # Add overall title
+    fig.suptitle(title, fontsize=16, y=0.98)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+    # Save and display
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.show()
     plt.close()
     
+    return embedding, group_labels
+
+
+def compute_stacked_umap_with_overlay(fingerprints_list, labels, save_path, title='', n_neighbors=15, min_dist=0.1, random_state=42):
+    """
+    Enhanced version that includes an overlay plot showing all groups together
+    """
+    assert len(fingerprints_list) == len(labels), "Number of fingerprints lists must match number of labels"
+    
+    # Concatenate and track indices
+    all_fps = np.concatenate(fingerprints_list, axis=0)
+    group_sizes = [len(fps) for fps in fingerprints_list]
+    group_indices = np.cumsum([0] + group_sizes)
+    
+    # Create group labels for each point
+    group_labels = []
+    for i, size in enumerate(group_sizes):
+        group_labels.extend([i] * size)
+    group_labels = np.array(group_labels)
+    
+    print(f"Data type: {type(all_fps)}")
+    print(f"Shape: {all_fps.shape}")
+    
+    # Apply UMAP
+    reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=min_dist, n_components=2, random_state=random_state)
+    embedding = reducer.fit_transform(all_fps)
+    
+    # Get embedding bounds
+    x_min, x_max = embedding[:, 0].min(), embedding[:, 0].max()
+    y_min, y_max = embedding[:, 1].min(), embedding[:, 1].max()
+    
+    # Grid configuration (add 1 for overlay plot)
+    n = len(fingerprints_list)
+    total_plots = n + 1  # +1 for overlay
+    cols = 3
+    rows = math.ceil(total_plots / cols)
+    
+    # Create subplots
+    fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 5 * rows))
+    axes = axes.flatten()
+    
+    cmap = plt.get_cmap('tab20') if n > 10 else plt.get_cmap('tab10')
+    
+    # Plot overlay first
+    ax = axes[0]
+    for i in range(n):
+        start, end = group_indices[i], group_indices[i + 1]
+        ax.scatter(
+            embedding[start:end, 0],
+            embedding[start:end, 1],
+            s=8,
+            color=cmap(i),
+            alpha=0.6,
+            label=labels[i]
+        )
+    ax.set_title('All Groups Overlay', fontsize=12, fontweight='bold')
+    ax.set_xlabel('UMAP-1')
+    ax.set_ylabel('UMAP-2')
+    ax.set_xlim(x_min - 0.1 * (x_max - x_min), x_max + 0.1 * (x_max - x_min))
+    ax.set_ylim(y_min - 0.1 * (y_max - y_min), y_max + 0.1 * (y_max - y_min))
+    ax.grid(alpha=0.3)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # Plot individual groups
+    for i in range(n):
+        ax = axes[i + 1]
+        start, end = group_indices[i], group_indices[i + 1]
+        ax.scatter(
+            embedding[start:end, 0],
+            embedding[start:end, 1],
+            s=10,
+            color=cmap(i),
+            alpha=0.7
+        )
+        ax.set_title(labels[i], fontsize=12)
+        ax.set_xlabel('UMAP-1')
+        ax.set_ylabel('UMAP-2')
+        ax.set_xlim(x_min - 0.1 * (x_max - x_min), x_max + 0.1 * (x_max - x_min))
+        ax.set_ylim(y_min - 0.1 * (y_max - y_min), y_max + 0.1 * (y_max - y_min))
+        ax.grid(alpha=0.3)
+    
+    # Hide empty subplots
+    for i in range(total_plots, len(axes)):
+        axes[i].axis('off')
+    
+    # Add overall title
+    fig.suptitle(title, fontsize=16, y=0.98)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+    # Save and display
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+    
+    return embedding, group_labels
+    
 def main():
-    parser = argparse.ArgumentParser(description='Sample mol with coditioning drawn from clusters')
-    parser.add_argument('--train_fp_file', type=str, default="/projects/iktos/pierre/CondGeoLDM/data/fingerprints_data/jump_fingerprints.npy",
+    parser = argparse.ArgumentParser(description='Sample mol with conditioning drawn from clusters')
+    parser.add_argument('--train_fp_file', type=str, default="/projects/iktos/pierre/CondGeoLDM/data/fingerprints_data/geom_fingerprints.npy",
                         help='Path to the embeddings data directory')
     parser.add_argument('--n_samples', type=int, default=10,
                         help='Number of samples to generate')
@@ -294,13 +407,16 @@ def main():
         # "flowmol" : "/projects/iktos/pierre/sampled_mols/flowmol/50k_new_molecules_geom.sdf",
         # "gcdm" : "/projects/iktos/pierre/sampled_mols/GCDM/all_batches_geom.sdf",
         # "eqgat" : "/projects/iktos/pierre/sampled_mols/EQGAT‑diff/geom.sdf",
-        # # "geoldm" : "/projects/iktos/pierre/sampled_mols/GeoLDM/geom.sdf",
-        # # "jumpxatt" : "/projects/iktos/pierre/sampled_mols/jump/1000xatt.sdf",
-        # # "jumpvanilla" : "/projects/iktos/pierre/sampled_mols/jump/1000vanilla.sdf",
+        # "geoldm" : "/projects/iktos/pierre/sampled_mols/GeoLDM/geom.sdf",
+        # "jumpxatt" : "/projects/iktos/pierre/sampled_mols/jump/1000xatt.sdf",
+        # "jumpvanilla" : "/projects/iktos/pierre/sampled_mols/jump/1000vanilla.sdf",
         # "jumpphen0" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed0.sdf",
         # "jumpphen1" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed1.sdf",
         # "jumpphen2" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed2.sdf",
-        "jumpphen19" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed19.sdf",
+        # "jumpphen19" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed19.sdf",
+        # "jumpphen12" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed12.sdf",
+        # "jumpphen14" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed14.sdf",
+        "geoldm_ogmodelprep" : "/projects/iktos/pierre/sampled_mols/GeoLDM/ogmodel_prep.sdf",
     }
     
     fingerprints = {
@@ -326,7 +442,7 @@ def main():
 
     for name, fp in fingerprints.items():
         # Sauvegarde des empreintes
-        fp_path = output_dir / f"fp_{name}_from_jump.npy"
+        fp_path = output_dir / f"fp_{name}_from_geom.npy"
         save_fingerprints_file(fp, str(fp_path))
 
         # Sauvegarde des best hits (résultat du top-k)

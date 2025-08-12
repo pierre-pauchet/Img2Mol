@@ -372,7 +372,7 @@ def main():
                 epoch_folder = io_path / 'outputs' / f'{args.exp_name}'
                 epoch_folder.mkdir(parents=True, exist_ok=True)
 
-                utils.save_model(optim, epoch_folder / 'optim.npy')
+                utils.save_model(optim, epoch_folder / 'flow.npy')
                 utils.save_model(model, epoch_folder / 'generative_model.npy')
                 if args.ema_decay > 0:
                     utils.save_model(model_ema, epoch_folder / 'generative_model_ema.npy')

@@ -121,7 +121,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datadir', type=str, default="/import/pr_iktos/pierre/CondGeoLDM",
                         help='specify absolute root of model path')
-    parser.add_argument('--model_path', type=str, default="outputs/edm_1    ",
+    parser.add_argument('--model_path', type=str, default="outputs/geom_pretrained",
                         help='Specify relative model path')
     parser.add_argument('--n_samples', type=int, default=100,
                         help='Amount of samples')
