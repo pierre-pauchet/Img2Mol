@@ -369,7 +369,7 @@ def main():
                         
             # save current model
             if args.save_model:
-                epoch_folder = io_path / 'outputs' / f'{args.exp_name}' / f'epoch_{epoch}'
+                epoch_folder = io_path / 'outputs' / f'{args.exp_name}'
                 epoch_folder.mkdir(parents=True, exist_ok=True)
 
                 utils.save_model(optim, epoch_folder / 'optim.npy')
