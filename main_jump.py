@@ -219,7 +219,7 @@ utils.create_folders(args)
 if args.no_wandb:
     mode = "disabled"
 else:
-    mode = 'online' if online else 'offline'
+    mode = 'online' if args.online else 'offline'
 kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion', 'config': vars(args),
           'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': mode}
 wandb.init(**kwargs)
