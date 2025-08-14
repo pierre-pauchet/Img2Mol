@@ -49,6 +49,8 @@ class JumpDataset(Dataset):
                 on a sample.
         """
         self.transform = transform
+        if percent_train_ds is not None:
+            data_list = self._subsample(data_list, percent_train_ds)
         self.data_list = data_list
         # Sort the data list by size
         lengths = [len(mol["atom_types"]) for mol in data_list]
@@ -58,8 +60,7 @@ class JumpDataset(Dataset):
         self.split_indices = np.unique(np.sort(lengths), return_index=True)[1][1:]
 
         # Take smaller subset of molecule
-        if percent_train_ds is not None:
-            data_list = self._subsample(data_list, percent_train_ds)
+
 
     def _subsample(self, data_list, percent_train_ds):
         assert 0 < percent_train_ds <= 100, "percent_train_ds must be between 0 and 100"

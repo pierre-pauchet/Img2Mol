@@ -23,3 +23,4 @@ srun python main_jump.py --dataset jump --n_epochs 40 --n_stability_samples 100 
 --trainable_ae --train_diffusion --online False \
 --latent_nf 2 --percent_train_ds 100 --exp_name jump_xatt_h_6layers_40e --viability_metrics_epochs 1 \
 --data_file data/jump/charac_30_h.npy --conditioning_mode attention
+

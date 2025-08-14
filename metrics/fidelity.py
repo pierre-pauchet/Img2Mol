@@ -53,6 +53,7 @@ def postprocess_rdkit_mols(mols_list):
             Chem.SanitizeMol(mol)
             mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols = True)
             largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())  # Get the largest fragment
+            Chem.AddHs(largest_mol)  
             valid_mols.append(largest_mol)
         except Exception as e:
             print(f"Error sanitizing molecule: {e}")
@@ -389,7 +390,7 @@ def compute_stacked_umap_with_overlay(fingerprints_list, labels, save_path, titl
     
 def main():
     parser = argparse.ArgumentParser(description='Sample mol with conditioning drawn from clusters')
-    parser.add_argument('--train_fp_file', type=str, default="/projects/iktos/pierre/CondGeoLDM/data/fingerprints_data/geom_fingerprints.npy",
+    parser.add_argument('--train_fp_file', type=str, default="/projects/iktos/pierre/CondGeoLDM/data/fingerprints_data/jump_fingerprints.npy",
                         help='Path to the embeddings data directory')
     parser.add_argument('--n_samples', type=int, default=10,
                         help='Number of samples to generate')
@@ -408,19 +409,20 @@ def main():
         # "gcdm" : "/projects/iktos/pierre/sampled_mols/GCDM/all_batches_geom.sdf",
         # "eqgat" : "/projects/iktos/pierre/sampled_mols/EQGAT‑diff/geom.sdf",
         # "geoldm" : "/projects/iktos/pierre/sampled_mols/GeoLDM/geom.sdf",
-        # "jumpxatt" : "/projects/iktos/pierre/sampled_mols/jump/1000xatt.sdf",
-        # "jumpvanilla" : "/projects/iktos/pierre/sampled_mols/jump/1000vanilla.sdf",
-        # "jumpphen0" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed0.sdf",
-        # "jumpphen1" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed1.sdf",
-        # "jumpphen2" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed2.sdf",
-        # "jumpphen19" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed19.sdf",
-        # "jumpphen12" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed12.sdf",
-        # "jumpphen14" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed14.sdf",
-        "geoldm_ogmodelprep" : "/projects/iktos/pierre/sampled_mols/GeoLDM/ogmodel_prep.sdf",
+        "jumpxatt" : "/projects/iktos/pierre/sampled_mols/jump/1000xatt.sdf",
+        "jumpvanilla" : "/projects/iktos/pierre/sampled_mols/jump/1000vanilla.sdf",
+        "jumpphen0" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed0.sdf",
+        "jumpphen1" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed1.sdf",
+        "jumpphen2" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed2.sdf",
+        "jumpphen19" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed19.sdf",
+        "jumpphen12" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed12.sdf",
+        "jumpphen14" : "/projects/iktos/pierre/sampled_mols/jump/250xattfixed14.sdf",
+        # "geoldm_ogmodelprep" : "/projects/iktos/pierre/sampled_mols/GeoLDM/ogmodel_prep.sdf",
+        # "debug" : "/projects/iktos/pierre/sampled_mols/GeoLDM/debug.sdf",
     }
     
     fingerprints = {
-        name: rdkit_mols_to_fingerprints(load_sdf_file(path), fp_size=1024)
+        name: rdkit_mols_to_fingerprints(load_sdf_file(path), fp_size=1024, radius=3)
         for name, path in sdf_paths.items() if path is not None
     }
 
@@ -442,15 +444,15 @@ def main():
 
     for name, fp in fingerprints.items():
         # Sauvegarde des empreintes
-        fp_path = output_dir / f"fp_{name}_from_geom.npy"
+        fp_path = output_dir / f"fp_{name}_from_jump.npy"
         save_fingerprints_file(fp, str(fp_path))
 
         # Sauvegarde des best hits (résultat du top-k)
         hits, _, _ = mallats[name]
         hits_path = output_dir / f"best_hits_{name}.npy"
         np.save(hits_path, hits)
-    # ss, _, a = compute_top_k_retrieval_joblib(train_fp_50k, train_fp, k=4, batch_size=100, n_jobs=-1)
-    # np.save( '/projects/iktos/pierre/CondGeoLDM/data/fingerprints_data/best_hits_geom_50k.npy', ss[:,1:])
+    ss, _, a = compute_top_k_retrieval_joblib(train_fp_50k, train_fp, k=4, batch_size=100, n_jobs=-1)
+    np.save( '/projects/iktos/pierre/CondGeoLDM/data/fingerprints_data/best_hits_geom_50k.npy', ss[:,1:])
 
     
     

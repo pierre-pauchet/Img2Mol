@@ -38,8 +38,8 @@ class GCL(nn.Module):
                 kdim=phen_nf,
                 vdim=phen_nf,
             )
-            # self.phenotype_mlp = nn.Linear(phen_nf, hidden_nf)
-            # self.layer_norm = nn.LayerNorm(hidden_nf)
+            self.phenotype_mlp = nn.Linear(phen_nf, hidden_nf)
+            self.layer_norm = nn.LayerNorm(hidden_nf)
         
     def edge_model(self, source, target, edge_attr, edge_mask, phenotypes):
         if edge_attr is None:  # Unused.
@@ -69,7 +69,11 @@ class GCL(nn.Module):
             # out_linear = self.layer_norm(out_linear)
             out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
             
-
+            # #without proj_mlp : 
+            # attn_out, attn_weights = self.cross_attn_block(
+            #     query=out_linear, 
+            #     key= phenotypes, 
+            #     value=phenotypes) # X_Att between messages and phenotypes
             
             out_linear = out_linear + attn_out
 
@@ -180,8 +184,8 @@ class EquivariantBlock(nn.Module):
         if node_mask is not None:
             h = h * node_mask
         # skip connections 
-        h = h + h0 
-        x = x + x0
+        # h = h + h0 
+        # x = x + x0
         return h, x
 
 
