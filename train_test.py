@@ -78,27 +78,27 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
                   f"RegTerm: {reg_term.item():.1f}, "
                   f"GradNorm: {grad_norm:.1f}")
         nll_epoch.append(nll.item())
-        # if (epoch % args.test_epochs == 0) and (i % args.visualize_every_batch == 0)  and args.train_diffusion: #and not (epoch == 0 and i == 0)
-        #     start = time.time()
-        #     if len(args.conditioning) > 0:
-        #         save_and_sample_conditional(args, device, model_ema, prop_dist, dataset_info, epoch=epoch, test_loaders=test_loaders)
-        #     save_and_sample_chain(model_ema, args, device, dataset_info, prop_dist, epoch=epoch,
-        #                           batch_id=str(i), test_loaders=test_loaders)
-        #     sample_different_sizes_and_save(model_ema, nodes_dist, args, device, dataset_info,
-        #                                     prop_dist, epoch=epoch, test_loaders=test_loaders)
-        #     print(f'Sampling took {time.time() - start:.2f} seconds')
-        #     examples = data
-        #     wandb.log({"train_sample": wandb.Table(data=[[str(examples)]], columns=["Sample"])})
-        #     base_output_path = Path(args.datadir) / "outputs" / args.exp_name / f"epoch_{epoch}_{i}"
-        #     print("base_output", base_output_path)
-        #     print("vis")
-        #     vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=None)
-        #     print("vis_chain")
+        if (epoch % args.test_epochs == 0) and (i % args.visualize_every_batch == 0)  and args.train_diffusion: #and not (epoch == 0 and i == 0)
+            start = time.time()
+            if len(args.conditioning) > 0:
+                save_and_sample_conditional(args, device, model_ema, prop_dist, dataset_info, epoch=epoch, test_loaders=test_loaders)
+            save_and_sample_chain(model_ema, args, device, dataset_info, prop_dist, epoch=epoch,
+                                  batch_id=str(i), test_loaders=test_loaders)
+            sample_different_sizes_and_save(model_ema, nodes_dist, args, device, dataset_info,
+                                            prop_dist, epoch=epoch, test_loaders=test_loaders)
+            print(f'Sampling took {time.time() - start:.2f} seconds')
+            examples = data
+            wandb.log({"train_sample": wandb.Table(data=[[str(examples)]], columns=["Sample"])})
+            base_output_path = Path(args.datadir) / "outputs" / args.exp_name / f"epoch_{epoch}_{i}"
+            print("base_output", base_output_path)
+            print("vis")
+            vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=None)
+            print("vis_chain")
             
-        #     vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=None)
-        #     if len(args.conditioning) > 0:
-        #         vis.visualize_chain("outputs/%s/epoch_%d/conditional/" % (args.exp_name, epoch), dataset_info,
-        #                             wandb=wandb, mode="conditional")
+            vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=None)
+            if len(args.conditioning) > 0:
+                vis.visualize_chain("outputs/%s/epoch_%d/conditional/" % (args.exp_name, epoch), dataset_info,
+                                    wandb=wandb, mode="conditional")
         wandb.log({"Batch NLL": nll.item()}, commit=True)
         wandb.log({"GradNorm": grad_norm}, commit=True)
         prof.step() if prof is not None else None

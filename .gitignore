@@ -42,3 +42,4 @@ temp/*
 concat_sdf.py
 dl_from_jz.sh
 run_main_jump.sh
+sampled_mols/*

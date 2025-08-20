@@ -265,6 +265,8 @@ def main():
     for i in range(torch.cuda.device_count()):
         print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
     args.cuda = not args.no_cuda and torch.cuda.is_available()
+    args.datadir = io_path
+    args.data_file = io_path  / eval_args.data_file
     device = torch.device("cuda" if args.cuda else "cpu")
     args.device = device
     dtype = torch.float32

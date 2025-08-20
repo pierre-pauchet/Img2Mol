@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"  # Set CUDA_VISIBLE_DEVICES to use GPU 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 
 
 try:
     from rdkit import Chem
@@ -339,10 +339,10 @@ def main():
         if isinstance(model, en_diffusion.EnVariationalDiffusion):
             wandb.log(model.log_info(), commit=True)
         if epoch % args.test_epochs == 0:
-            # analyze_and_save(args=args, epoch=epoch, model_sample=model_ema, nodes_dist=nodes_dist,
-            #                      dataset_info=dataset_info, device=device,
-            #                      prop_dist=prop_dist, n_samples=args.n_stability_samples,
-            #                      test_loaders=test_loaders)
+            analyze_and_save(args=args, epoch=epoch, model_sample=model_ema, nodes_dist=nodes_dist,
+                                 dataset_info=dataset_info, device=device,
+                                 prop_dist=prop_dist, n_samples=args.n_stability_samples,
+                                 test_loaders=test_loaders)
 
             if not args.break_train_epoch and args.train_diffusion and epoch % args.viability_metrics_epochs == 0:
                 analyze_and_save(args=args, epoch=epoch, model_sample=model_ema, nodes_dist=nodes_dist,
@@ -396,5 +396,5 @@ def main():
 
 
 if __name__ == "__main__":
-    print("Starting...'")
+    print("Starting...")
     main()

@@ -122,6 +122,8 @@ def main():
         help='N tries to find stable molecule for gif animation')
     parser.add_argument('--n_nodes', type=int, default=44,
                         help='number of atoms in molecule for gif animation')
+    parser.add_argument('--data_file', type=str, default='data/jump/charac_30_h.npy')
+    parser.add_argument('--datadir', type=str, default='/projects/iktos/pierre/CondGeoLDM/',)
 
     eval_args, unparsed_args = parser.parse_known_args()
 
@@ -138,7 +140,10 @@ def main():
     if not hasattr(args, 'conditioning_mode'):
         args.conditioning_mode = 'original'
 
+    args.data_file = eval_args.datadir + eval_args.data_file
     args.cuda = not args.no_cuda and torch.cuda.is_available()
+    
+    args.data_file= eval_args.datadir + eval_args.data_file
     device = torch.device("cuda" if args.cuda else "cpu")
     args.device = device
     dtype = torch.float32

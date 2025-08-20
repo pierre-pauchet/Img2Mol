@@ -93,13 +93,15 @@ class GCL(nn.Module):
         out = x + self.node_mlp(agg)
         return out, agg
 
-    def forward(self, h, edge_index, edge_attr=None, node_attr=None, node_mask=None, edge_mask=None, phenotypes=None):
+    def forward(self, h, edge_index, edge_attr=None, node_attr=None, node_mask=None, 
+                edge_mask=None, phenotypes=None, latent_coords_range=10.0):
         row, col = edge_index
         edge_feat, mij = self.edge_model(h[row], h[col], edge_attr, edge_mask, phenotypes)
         h, agg = self.node_model(h, edge_index, edge_feat, node_attr)
+        h_clipped = torch.tanh(h) * latent_coords_range  # Clip to range
         if node_mask is not None:
-            h = h * node_mask
-        return h, mij
+            h_clipped = h_clipped * node_mask
+        return h_clipped,  mij
 
 class EquivariantUpdate(nn.Module):
     def __init__(self, hidden_nf, normalization_factor, aggregation_method,
