@@ -81,7 +81,8 @@ def sample_different_sizes(
     dataset_info,
     n_samples=10,
     save=False,
-    batch_size=150
+    batch_size=150,
+    test_loaders=None
 ):
     nodesxsample = nodes_dist.sample(n_samples)
 
@@ -96,7 +97,7 @@ def sample_different_sizes(
     for i in tqdm.tqdm(range(0, len(nodesxsample), batch_size)):
         one_hot, charges, x, node_mask = sample(
             args, device, generative_model, dataset_info, nodesxsample=nodesxsample[i:i+batch_size],
-            random_idx=False
+            random_idx=False, test_loaders=test_loaders
         )
         # all_one_hot.append(one_hot)
         # all_charges.append(charges)
@@ -134,6 +135,7 @@ def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*
     n_tries=50,
     save=False,
     batch_size = 100,
+    test_loaders=None,
 ):
     io_path = Path(eval_args.datadir)
     
@@ -147,7 +149,8 @@ def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*
 
     for i in tqdm.tqdm(range(0, len(nodesxsample), batch_size)):
         one_hot, charges, x, node_mask = sample(
-            args, device, flow, dataset_info, nodesxsample=nodesxsample[i:i+batch_size]
+            args, device, flow, dataset_info, nodesxsample=nodesxsample[i:i+batch_size], 
+            test_loaders=test_loaders
         )
         all_one_hot.append(one_hot)
         all_charges.append(charges)
@@ -240,7 +243,7 @@ def main():
     parser.add_argument(
         "--n_nodes",type=int, default=44 ,help="Size of fixed-sized generation")
     parser.add_argument(
-        "--data_file",type=str, default="data/jump/charac_30_h.npy",
+        "--data_file",type=str, default="/projects/iktos/pierre/CondGeoLDM/data/jump/charac_30_h.npy",
         help="Conditioning type: geom, jump, or both")
     parser.add_argument('--train_fp_file', type=str, default="data/fingerprints_data/jump_fingerprints.npy",
                         help='Relative path to the embeddings data directory')
@@ -265,13 +268,13 @@ def main():
     for i in range(torch.cuda.device_count()):
         print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
     args.cuda = not args.no_cuda and torch.cuda.is_available()
-    args.datadir = io_path
-    args.data_file = io_path  / eval_args.data_file
+    args.datadir = eval_args.datadir
+    args.data_file = io_path / eval_args.data_file
     device = torch.device("cuda" if args.cuda else "cpu")
     args.device = device
     dtype = torch.float32
     utils.create_folders(args)
-
+    print(args)
     # Retrieve dataset info and dataloaders
     dataset_info = get_dataset_info(args.dataset, args.remove_h)
 
@@ -289,6 +292,8 @@ def main():
     flow_state_dict = torch.load(io_path / eval_args.model_path / fn, map_location=device)
     flow.load_state_dict(flow_state_dict)
 
+    with open('/projects/iktos/pierre/CondGeoLDM/data/jump/train_embeddings.npy', 'rb') as f:
+        train_embeddings = np.load(f)
     
     # 1. Sample molecules from trained models.
     print("Sampling molecules...")
@@ -303,6 +308,7 @@ def main():
             n_samples=eval_args.n_samples,
             n_tries=eval_args.n_tries,
             save=eval_args.save_samples,
+            embeddings=train_embeddings # on purpose
         )
     else:
         one_hot, charges, x, node_mask = sample_different_sizes(
@@ -314,6 +320,7 @@ def main():
             dataset_info,
             n_samples=eval_args.n_samples,
             save=eval_args.save_samples,
+            embeddings=train_embeddings
         )
 
     if not eval_args.save_samples:

@@ -143,7 +143,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
 
 
 def sample(args, device, generative_model, dataset_info,
-           prop_dist=None, test_loaders=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
+           prop_dist=None, embeddings=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
            fix_noise=False, random_idx=False):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
 
@@ -169,20 +169,19 @@ def sample(args, device, generative_model, dataset_info,
         context = context.unsqueeze(1).repeat(1, max_n_nodes, 1).to(device) * node_mask
     else:
         context = None
-    if args.conditioning_mode == 'cross_attention':
+    if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
         all_phenotypes = []
-        for batch in test_loaders:
-            emb = batch['embeddings'].clone()
-            all_phenotypes.append(emb)
-
-        all_phenotypes = torch.cat(all_phenotypes, dim=0).to(device)
+        print("WE ARE CONDITIONING YAY")
+            # if
         if random_idx:
-                random_embedding_idx = torch.randint(0, all_phenotypes.size(0), (batch_size,))
+                random_embedding_idx = torch.randint(0, embeddings.size(0), (batch_size,))
                 phenotypes = all_phenotypes[random_embedding_idx]
         else:
-            phenotypes = all_phenotypes[:batch_size]
-            # phenotypes = all_phenotypes[12].repeat(batch_size, 1).to(device)  
+            # phenotypes = all_phenotypes[:batch_size]
+            phenotypes = all_phenotypes[14].repeat(batch_size, 1).to(device)  
+        print(phenotypes)
+        print(phenotypes.shape)
     else:
         phenotypes = None
     
