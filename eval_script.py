@@ -37,7 +37,7 @@ def save_and_sample_chain(args, eval_args, device, flow, n_tries, n_nodes, datas
         target_path = io_path/ "eval"/ "chain{i}"
 
         one_hot, charges, x, node_mask = sample_chain(
-            args, device, flow, n_tries, dataset_info, test_loaders=None
+            args, device, flow, n_tries, dataset_info,
         )
         for sample_id in range(one_hot.size(0)):
             vis.save_xyz_file(
@@ -85,23 +85,17 @@ def sample_different_sizes(
 ):
     nodesxsample = nodes_dist.sample(n_samples)
 
-    # one_hot, charges, x, node_mask = sample(
-    #     args, device, generative_model, dataset_info, nodesxsample=nodesxsample
-    # )
-    # all_one_hot = []
-    # all_charges = []
-    # all_x = []
-    # all_node_mask = []
-
     for i in tqdm.tqdm(range(0, len(nodesxsample), batch_size)):
+        test = sample(
+            args, device, generative_model, dataset_info, nodesxsample=nodesxsample[i:i+batch_size],
+            random_idx=False, 
+        )
+        print(test)
+        print(len(test))
         one_hot, charges, x, node_mask = sample(
             args, device, generative_model, dataset_info, nodesxsample=nodesxsample[i:i+batch_size],
             random_idx=False
         )
-        # all_one_hot.append(one_hot)
-        # all_charges.append(charges)
-        # all_x.append(x)
-        # all_node_mask.append(node_mask)
         if save:
             vis.save_xyz_file(
                 str(Path(eval_args.datadir) / eval_args.save_path / "eval" / "molecules"),
@@ -113,14 +107,7 @@ def sample_different_sizes(
                 dataset_info=dataset_info,
                 node_mask=node_mask,
             )
-        # Concatenate all batches into single tensors
-    # all_one_hot = torch.cat(all_one_hot, dim=0)
-    # all_charges = torch.cat(all_charges, dim=0)
-    # all_x = torch.cat(all_x, dim=0)
-    # all_node_mask = torch.cat(all_node_mask, dim=0)
-    # print(all_one_hot.shape)
-
-    # return all_one_hot, all_charges, all_x, all_node_mask
+    return one_hot, charges, x, node_mask
 
 
 def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*n_samples samples
@@ -147,7 +134,7 @@ def sample_only_stable_different_sizes(  #TODO : fix the fn returning n_samples*
 
     for i in tqdm.tqdm(range(0, len(nodesxsample), batch_size)):
         one_hot, charges, x, node_mask = sample(
-            args, device, flow, dataset_info, nodesxsample=nodesxsample[i:i+batch_size]
+            args, device, flow, dataset_info, nodesxsample=nodesxsample[i:i+batch_size], 
         )
         all_one_hot.append(one_hot)
         all_charges.append(charges)
@@ -260,10 +247,6 @@ def main():
     
     with open(io_path / eval_args.model_path /  "args.pickle", "rb") as f:
         args = pickle.load(f)
-    print("CUDA available:", torch.cuda.is_available())
-    print("Number of GPUs:", torch.cuda.device_count())
-    for i in range(torch.cuda.device_count()):
-        print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if args.cuda else "cpu")
     args.device = device
@@ -289,7 +272,6 @@ def main():
     fn = "generative_model_ema.npy" if args.ema_decay > 0 else "generative_model.npy"
     flow_state_dict = torch.load(io_path / eval_args.model_path / fn, map_location=device)
     flow.load_state_dict(flow_state_dict)
-
     
     # 1. Sample molecules from trained models.
     print("Sampling molecules...")

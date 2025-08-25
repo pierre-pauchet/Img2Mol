@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0,2,3"  # Set CUDA_VISIBLE_DEVICES to use GPU 
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"  # Set CUDA_VISIBLE_DEVICES to use GPU 
 
 try:
     from rdkit import Chem
@@ -319,13 +319,12 @@ def main():
 
     best_nll_val = 1e10
     # best_nll_test = 1e1
-    test_loaders = dataloaders['test']
     
     ## Profiling 
     # profiler(args=args, loader=dataloaders["train"], epoch=0, model=model, model_dp=model_dp,
     #                 model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
     #                 nodes_dist=nodes_dist, dataset_info=dataset_info,
-    #                 gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders)
+    #                 gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist,)
     # print("Done profiling")
 
     
@@ -335,7 +334,7 @@ def main():
                     model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
                     nodes_dist=nodes_dist, dataset_info=dataset_info, prof=None,
                     gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, 
-                    test_loaders=test_loaders)
+                    )
         print(f"Epoch took {time.time() - start_epoch:.1f} seconds.")
         if isinstance(model, en_diffusion.EnVariationalDiffusion):
             wandb.log(model.log_info(), commit=True)
@@ -344,7 +343,7 @@ def main():
                 analyze_and_save(args=args, epoch=epoch, model_sample=model_ema, nodes_dist=nodes_dist,
                                  dataset_info=dataset_info, device=device,
                                  prop_dist=prop_dist, n_samples=args.n_stability_samples,
-                                 test_loaders=test_loaders)
+                                 )
 
             nll_val = test(args=args, loader=dataloaders['valid'], epoch=epoch, eval_model=model_ema_dp,
                            partition='Val', device=device, dtype=dtype, nodes_dist=nodes_dist,
@@ -383,11 +382,11 @@ def main():
             wandb.log({"Val loss ": nll_val, "Epoch": epoch}, commit=True)
             # wandb.log({"Best cross-validated test loss ": best_nll_test, "Epoch":epoch}, commit=True)
             
-        nll_test = test(args=args, loader=dataloaders['test'], epoch=epoch, eval_model=model_ema_dp,
-        partition='Test', device=device, dtype=dtype,
-        nodes_dist=nodes_dist, property_norms=property_norms)
-        print('Test loss:  %.4f' % nll_test)
-        wandb.log({"Test loss ": nll_test, "Epoch":epoch}, commit=True)
+    nll_test = test(args=args, loader=dataloaders['test'], epoch=epoch, eval_model=model_ema_dp,
+    partition='Test', device=device, dtype=dtype,
+    nodes_dist=nodes_dist, property_norms=property_norms)
+    print('Test loss:  %.4f' % nll_test)
+    wandb.log({"Test loss ": nll_test, "Epoch":epoch}, commit=True)
         
 
 

@@ -77,7 +77,7 @@ def compute_top_k_retrieval(fingerprints, train_fingerprints, k=1, threshold=0.9
     nearest_indices = np.argsort(similarities, axis=1)[:, -k:][:, ::-1]
     mask = nearest_neighbours[:, 0] >= threshold # max values
     valid_similarities = nearest_neighbours[mask]
-    retrieval = len(valid_similarities) / (len(nearest_neighbours))
+    retrieval = len(valid_similarities) / (len(nearest_neighbours)+1e-8)
     
     return nearest_neighbours, retrieval, nearest_indices
 

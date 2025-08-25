@@ -52,7 +52,7 @@ def reverse_tensor(x):
 
 
 def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, 
-                 test_loaders=None, random_idx=False, n_samples=4):
+                 random_idx=True, n_samples=4):
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
     elif args.dataset == 'geom' :
@@ -64,6 +64,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
     else:
         raise ValueError()
 
+    
     # TODO FIX: This conditioning just zeros.
     if args.context_node_nf > 0:
         context = prop_dist.sample(n_nodes).unsqueeze(1).unsqueeze(0)
@@ -71,20 +72,21 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
         #context = torch.zeros(n_samples, n_nodes, args.context_node_nf).to(device)
     else:
         context = None
-    if args.conditioning_mode == 'cross_attention':
-        # samples phenotypes for cross-attention conditioning from the test loaders
-        all_phenotypes = []
-        for batch in test_loaders:
-            emb = batch['embeddings'].clone()
-            all_phenotypes.append(emb)
-
-        all_phenotypes = torch.cat(all_phenotypes, dim=0).to(device)
+    if args.conditioning_mode == 'attention':
+        # samples phenotypes for cross-attention conditioning from the train loaders
+        phenotypes = np.load('/projects/iktos/pierre/CondGeoLDM/data/jump/train_embeddings.npy',
+                mmap_mode='r', 
+                allow_pickle=True
+                )
+        print("WE ARE CONDITIONING YAY")
         if random_idx:
-                random_embedding_idx = torch.randint(0, all_phenotypes.size(0), (n_samples,))
-                phenotypes = all_phenotypes[random_embedding_idx]
+            random_embedding_idx = torch.randint(0, phenotypes.shape[0], (n_samples,))
+            phenotypes_to_sample_with = phenotypes[random_embedding_idx]
         else:
-            phenotypes = all_phenotypes[:n_samples]
-    else: 
+            # phenotypes = all_phenotypes[:batch_size]
+            phenotypes_to_sample_with = phenotypes[14].repeat(n_samples, 1).to(device)  
+        phenotypes = phenotypes_to_sample_with
+    else:
         phenotypes = None
         
     # node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
@@ -143,7 +145,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
 
 
 def sample(args, device, generative_model, dataset_info,
-           prop_dist=None, test_loaders=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
+           prop_dist=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
            fix_noise=False, random_idx=False):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
 
@@ -162,7 +164,6 @@ def sample(args, device, generative_model, dataset_info,
     edge_mask = edge_mask.view(batch_size * max_n_nodes * max_n_nodes, 1).to(device)
     node_mask = node_mask.unsqueeze(2).to(device)
 
-    # TODO FIX: This conditioning just zeros.
     if args.context_node_nf > 0:
         if context is None:
             context = prop_dist.sample_batch(nodesxsample)
@@ -171,23 +172,23 @@ def sample(args, device, generative_model, dataset_info,
         context = None
     if args.conditioning_mode == 'cross_attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
-        all_phenotypes = []
-        for batch in test_loaders:
-            emb = batch['embeddings'].clone()
-            all_phenotypes.append(emb)
-
-        all_phenotypes = torch.cat(all_phenotypes, dim=0).to(device)
+        phenotypes = np.load('/projects/iktos/pierre/CondGeoLDM/data/jump/train_embeddings.npy',
+        mmap_mode='r', 
+        allow_pickle=True
+        )
+        print("WE ARE CONDITIONING YAY")
         if random_idx:
-                random_embedding_idx = torch.randint(0, all_phenotypes.size(0), (batch_size,))
-                phenotypes = all_phenotypes[random_embedding_idx]
+            random_embedding_idx = torch.randint(0, phenotypes.shape(0), (batch_size,))
+            phenotypes_to_sample_with = torch.from_numpy(phenotypes[random_embedding_idx].copy()).to(device)
         else:
-            phenotypes = all_phenotypes[:batch_size]
-            # phenotypes = all_phenotypes[12].repeat(batch_size, 1).to(device)  
+            chosen_phen = torch.from_numpy(phenotypes[14].copy())
+            phenotypes_to_sample_with = chosen_phen.repeat(batch_size, 1).to(device)  
     else:
         phenotypes = None
     
     if args.probabilistic_model == 'diffusion':
-        x, h = generative_model.sample(batch_size, max_n_nodes, node_mask, edge_mask, context, phenotypes, fix_noise=fix_noise)
+        x, h = generative_model.sample(batch_size, max_n_nodes, node_mask, edge_mask, context, 
+                                       phenotypes_to_sample_with, fix_noise=fix_noise)
 
         assert_correctly_masked(x, node_mask)
         assert_mean_zero_with_mask(x, node_mask)

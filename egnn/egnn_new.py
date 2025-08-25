@@ -30,6 +30,7 @@ class GCL(nn.Module):
                 nn.Sigmoid())
             
         if self.phen_nf>0: # cross-attention block
+            print("Using cross-attention block in EGNN")
             self.cross_attn_block = nn.MultiheadAttention(
                 embed_dim=hidden_nf,
                 num_heads=2, # Might play around with this later
@@ -39,7 +40,7 @@ class GCL(nn.Module):
                 vdim=phen_nf,
             )
             # self.phenotype_mlp = nn.Linear(phen_nf, hidden_nf)
-            # self.layer_norm = nn.LayerNorm(hidden_nf)
+            self.layer_norm = nn.LayerNorm(hidden_nf)
         
     def edge_model(self, source, target, edge_attr, edge_mask, phenotypes):
         if edge_attr is None:  # Unused.
@@ -66,7 +67,7 @@ class GCL(nn.Module):
             #     value=phenotypes_proj) # X_Att between messages and phenotypes
             
             # out_linear = out_linear + attn_out
-            # # out_linear = self.layer_norm(out_linear)
+            # out_linear = self.layer_norm(out_linear)
             # out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
             
             # #without proj_mlp : 
@@ -76,7 +77,9 @@ class GCL(nn.Module):
                 value=phenotypes) # X_Att between messages and phenotypes
             
             out_linear = out_linear + attn_out
-
+            out_linear = self.layer_norm(out_linear)
+            out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
+            
         if edge_mask is not None:
             out = out * edge_mask
         return out, mij
@@ -93,7 +96,8 @@ class GCL(nn.Module):
         out = x + self.node_mlp(agg)
         return out, agg
 
-    def forward(self, h, edge_index, edge_attr=None, node_attr=None, node_mask=None, edge_mask=None, phenotypes=None):
+    def forward(self, h, edge_index, edge_attr=None, node_attr=None, node_mask=None, 
+                edge_mask=None, phenotypes=None, latent_coords_range=10.0):
         row, col = edge_index
         edge_feat, mij = self.edge_model(h[row], h[col], edge_attr, edge_mask, phenotypes)
         h, agg = self.node_model(h, edge_index, edge_feat, node_attr)

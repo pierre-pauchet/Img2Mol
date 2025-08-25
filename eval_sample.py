@@ -34,7 +34,7 @@ def save_and_sample_chain(args, eval_args, device, flow,
     target_path = ('eval/chain/')
 
     one_hot, charges, x, node_mask = sample_chain(
-        args, device, flow, n_tries, dataset_info, test_loaders=None)
+        args, device, flow, n_tries, dataset_info)
     for sample_id in range(one_hot.size(0)):
         vis.save_xyz_file(join(eval_args.model_path, f'{target_path}'),
                     one_hot[sample_id], charges[sample_id], x[sample_id], dataset_info,

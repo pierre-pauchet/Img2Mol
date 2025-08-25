@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dtype, property_norms, optim,
-                nodes_dist, gradnorm_queue, dataset_info, prop_dist, test_loaders, prof):
+                nodes_dist, gradnorm_queue, dataset_info, prop_dist, prof):
     model_dp.train()
     model.train()
     model.to(device)
@@ -78,22 +78,22 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
                   f"RegTerm: {reg_term.item():.1f}, "
                   f"GradNorm: {grad_norm:.1f}")
         nll_epoch.append(nll.item())
-        # if (epoch % args.test_epochs == 0) and (i % args.visualize_every_batch == 0)  and args.train_diffusion: #and not (epoch == 0 and i == 0)
-        #     start = time.time()
-        #     if len(args.conditioning) > 0:
-        #         save_and_sample_conditional(args, device, model_ema, prop_dist, dataset_info, epoch=epoch, test_loaders=test_loaders)
-        #     save_and_sample_chain(model_ema, args, device, dataset_info, prop_dist, epoch=epoch,
-        #                           batch_id=str(i), test_loaders=test_loaders)
-        #     sample_different_sizes_and_save(model_ema, nodes_dist, args, device, dataset_info,
-        #                                     prop_dist, epoch=epoch, test_loaders=test_loaders)
-        #     print(f'Sampling took {time.time() - start:.2f} seconds')
-        #     examples = data
-        #     wandb.log({"train_sample": wandb.Table(data=[[str(examples)]], columns=["Sample"])})
-        #     base_output_path = Path(args.datadir) / "outputs" / args.exp_name / f"epoch_{epoch}_{i}"
-        #     print("base_output", base_output_path)
-        #     print("vis")
-        #     vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=None)
-        #     print("vis_chain")
+        if (epoch % args.test_epochs == 0) and (i % args.visualize_every_batch == 0)  and args.train_diffusion: #and not (epoch == 0 and i == 0)
+            start = time.time()
+            if len(args.conditioning) > 0:
+                save_and_sample_conditional(args, device, model_ema, prop_dist, dataset_info, epoch=epoch,)
+            save_and_sample_chain(model_ema, args, device, dataset_info, prop_dist, epoch=epoch,
+                                  batch_id=str(i),)
+            sample_different_sizes_and_save(model_ema, nodes_dist, args, device, dataset_info,
+                                            prop_dist, epoch=epoch,)
+            print(f'Sampling took {time.time() - start:.2f} seconds')
+            examples = data
+            wandb.log({"train_sample": wandb.Table(data=[[str(examples)]], columns=["Sample"])})
+            base_output_path = Path(args.datadir) / "outputs" / args.exp_name / f"epoch_{epoch}_{i}"
+            print("base_output", base_output_path)
+            print("vis")
+            vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=None)
+            print("vis_chain")
             
         #     vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=None)
         #     if len(args.conditioning) > 0:
@@ -166,13 +166,13 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
     return nll_epoch / n_samples
 
 
-def save_and_sample_chain(model, args, device, dataset_info, prop_dist, test_loaders,
+def save_and_sample_chain(model, args, device, dataset_info, prop_dist,
                           epoch=0, id_from=0, batch_id=""):
     if hasattr(model, "module"):
         model = model.module
     one_hot, charges, x, node_mask = sample_chain(args=args, device=device, flow=model,
                                        n_tries=1, dataset_info=dataset_info, prop_dist=prop_dist, 
-                                       test_loaders=test_loaders)
+                                       )
 
     for sample_id in range(one_hot.size(0)):
         save_file = Path(args.datadir).resolve() / "outputs" / args.exp_name / f"epoch_{epoch}_{batch_id}" / "chain"
@@ -184,21 +184,21 @@ def save_and_sample_chain(model, args, device, dataset_info, prop_dist, test_loa
     return one_hot, charges, x
 
 
-def sample_different_sizes_and_save(model, nodes_dist, args, device, dataset_info, prop_dist, test_loaders,
+def sample_different_sizes_and_save(model, nodes_dist, args, device, dataset_info, prop_dist,
                                     n_samples=5, epoch=0, batch_size=100, batch_id=""):
     batch_size = min(batch_size, n_samples)
     for counter in range(int(n_samples/batch_size)):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(args, device, model, prop_dist=prop_dist,
                                                 nodesxsample=nodesxsample,
-                                                dataset_info=dataset_info, test_loaders=test_loaders)
+                                                dataset_info=dataset_info,)
         wandb.log({"Generated molecule": wandb.Table(data=[[str(x[1,:,:])]], columns=["Sample"])})
         save_file = Path(args.datadir).resolve() / "outputs" / args.exp_name / f"epoch_{epoch}_{batch_id}" / "chain"
         vis.save_xyz_file(str(save_file), one_hot, charges, x, dataset_info,
                           batch_size * counter, name="molecule")
 
 
-def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info, prop_dist, test_loaders,
+def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info, prop_dist,
                      n_samples=1000, batch_size=500):
     print(f"Sampling {n_samples} molecules at epoch {epoch} to calculate viability...")
     batch_size = min(batch_size, n_samples)
@@ -207,7 +207,7 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
     for i in tqdm.tqdm(range(int(n_samples / batch_size))):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(args, device, model_sample, dataset_info, prop_dist,
-                                                nodesxsample=nodesxsample, test_loaders=test_loaders)
+                                                nodesxsample=nodesxsample,)
 
         molecules["one_hot"].append(one_hot.detach().cpu())
         molecules["x"].append(x.detach().cpu())
@@ -226,8 +226,8 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
     return validity_dict
 
 
-def save_and_sample_conditional(args, device, model, prop_dist, dataset_info, epoch=0, id_from=0, test_loaders=None):
-    one_hot, charges, x, node_mask = sample_sweep_conditional(args, device, model, dataset_info, prop_dist, test_loaders=test_loaders)
+def save_and_sample_conditional(args, device, model, prop_dist, dataset_info, epoch=0, id_from=0):
+    one_hot, charges, x, node_mask = sample_sweep_conditional(args, device, model, dataset_info, prop_dist)
     save_file = Path(args.datadir).resolve() / "outputs" / args.exp_name / f"epoch_{epoch}" / "conditional"
     vis.save_xyz_file(
         str(save_file), one_hot, charges, x, dataset_info,

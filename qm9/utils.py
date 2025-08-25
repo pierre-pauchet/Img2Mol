@@ -144,7 +144,7 @@ def trace_handler(p):
 def profiler(args, loader, epoch, model, model_dp,
                     model_ema, ema, device, dtype, property_norms,
                     nodes_dist, dataset_info,
-                    gradnorm_queue, optim, prop_dist, test_loaders):
+                    gradnorm_queue, optim, prop_dist):
     """ 
     """
     my_schedule = schedule(
@@ -165,5 +165,5 @@ def profiler(args, loader, epoch, model, model_dp,
             train_epoch(args=args, loader=loader, epoch=epoch, model=model, model_dp=model_dp,
                     model_ema=model_ema, ema=ema, device=device, dtype=dtype, property_norms=property_norms,
                     nodes_dist=nodes_dist, dataset_info=dataset_info,
-                    gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist, test_loaders=test_loaders,
+                    gradnorm_queue=gradnorm_queue, optim=optim, prop_dist=prop_dist,
                     prof=prof)       
