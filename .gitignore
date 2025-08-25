@@ -40,3 +40,4 @@ sample_mols/*
 sampled_mols/*
 temp/*
 concat_sdf.py
+dl_from_jz.sh

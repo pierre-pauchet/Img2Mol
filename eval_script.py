@@ -267,6 +267,9 @@ def main():
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if args.cuda else "cpu")
     args.device = device
+    args.data_file = eval_args.data_file
+    args.datadir = eval_args.datadir
+    args.save_path = eval_args.save_path
     dtype = torch.float32
     utils.create_folders(args)
 
