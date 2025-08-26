@@ -56,8 +56,8 @@ def get_autoencoder(args, device, dataset_info, dataloader_train):
     in_node_nf = len(dataset_info['atom_decoder']) + int(args.include_charges)
     nodes_dist = DistributionNodes(histogram)
     if not hasattr(args, 'conditioning_mode'):
-        args.conditioning_mode = 'orginal'
-    phen_nf = dataset_info['phenotype_embedding_nf'] if args.conditioning_mode == 'cross_attention' else 0
+        args.conditioning_mode = 'original'
+    phen_nf = dataset_info['phenotype_embedding_nf'] if args.conditioning_mode == 'attention' else 0
     prop_dist = None
     if len(args.conditioning) > 0:
         prop_dist = DistributionProperty(dataloader_train, args.conditioning)
@@ -141,7 +141,7 @@ def get_latent_diffusion(args, device, dataset_info, dataloader_train):
         print('Warning: dynamics model is _not_ conditioned on time.')
         dynamics_in_node_nf = in_node_nf
 
-    phen_nf = dataset_info['phenotype_embedding_nf'] if args.conditioning_mode == 'cross_attention' else 0
+    phen_nf = dataset_info['phenotype_embedding_nf'] if args.conditioning_mode == 'attention' else 0
     
     net_dynamics = EGNN_dynamics_QM9(
         in_node_nf=dynamics_in_node_nf, context_node_nf=args.context_node_nf,

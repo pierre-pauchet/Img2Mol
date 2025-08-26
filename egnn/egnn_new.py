@@ -71,6 +71,8 @@ class GCL(nn.Module):
             # out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
             
             # #without proj_mlp : 
+            phenotypes = phenotypes.unsqueeze(1) # Reshape to bs, 1, hidden_nf
+            
             attn_out, attn_weights = self.cross_attn_block(
                 query=out_linear, 
                 key= phenotypes, 
@@ -107,7 +109,7 @@ class GCL(nn.Module):
 
 class EquivariantUpdate(nn.Module):
     def __init__(self, hidden_nf, normalization_factor, aggregation_method,
-                 edges_in_d=1, act_fn=nn.SiLU(), tanh=False, coords_range=10.0):
+                 edges_in_d=1, act_fn=nn.SiLU(), tanh=False, coords_range=15.0):
         super(EquivariantUpdate, self).__init__()
         self.tanh = tanh
         self.coords_range = coords_range

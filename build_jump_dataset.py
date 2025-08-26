@@ -48,18 +48,21 @@ class JumpDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.transform = transform
-        self.data_list = data_list
-        # Sort the data list by size
-        lengths = [len(mol["atom_types"]) for mol in data_list]
-        argsort = np.argsort(lengths)  # Sort by decreasing size
-        data_list = [data_list[i] for i in argsort]
-        # Store indices where the size changes
-        self.split_indices = np.unique(np.sort(lengths), return_index=True)[1][1:]
-
         # Take smaller subset of molecule
         if percent_train_ds is not None:
             data_list = self._subsample(data_list, percent_train_ds)
+        self.transform = transform
+        
+        # Sort the data list by size
+        lengths = [len(mol["atom_types"]) for mol in data_list]
+        argsort = np.argsort(lengths) # Sort by increasing size
+        data_list = [data_list[i] for i in argsort]
+        self.data_list = data_list
+        # Store indices where the size changes
+        lengths_sorted = [lengths[i] for i in argsort] 
+        self.split_indices = np.unique(np.sort(lengths_sorted), return_index=True)[1][1:]
+
+
 
     def _subsample(self, data_list, percent_train_ds):
         assert 0 < percent_train_ds <= 100, "percent_train_ds must be between 0 and 100"
@@ -82,8 +85,7 @@ class JumpDataset(Dataset):
         for mol_id in sampled_ids:
             filtered_data.extend(mol_groups[mol_id])
 
-        data_list = filtered_data
-        return np.array(data_list)
+        return filtered_data
 
     def __len__(self):
         return len(self.data_list)

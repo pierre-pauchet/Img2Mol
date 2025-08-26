@@ -81,10 +81,10 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
         print("WE ARE CONDITIONING YAY")
         if random_idx:
             random_embedding_idx = torch.randint(0, phenotypes.shape[0], (n_samples,))
-            phenotypes_to_sample_with = phenotypes[random_embedding_idx]
+            phenotypes_to_sample_with = torch.from_numpy(phenotypes[random_embedding_idx].copy()).to(device)
         else:
-            # phenotypes = all_phenotypes[:batch_size]
-            phenotypes_to_sample_with = phenotypes[14].repeat(n_samples, 1).to(device)  
+            chosen_phen = torch.from_numpy(phenotypes[14].copy())
+            phenotypes_to_sample_with = chosen_phen.repeat(n_samples, 1).to(device)  
         phenotypes = phenotypes_to_sample_with
     else:
         phenotypes = None
@@ -146,7 +146,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
 
 def sample(args, device, generative_model, dataset_info,
            prop_dist=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
-           fix_noise=False, random_idx=False):
+           fix_noise=False, random_idx=True):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
 
     assert int(torch.max(nodesxsample)) <= max_n_nodes
@@ -170,7 +170,7 @@ def sample(args, device, generative_model, dataset_info,
         context = context.unsqueeze(1).repeat(1, max_n_nodes, 1).to(device) * node_mask
     else:
         context = None
-    if args.conditioning_mode == 'cross_attention':
+    if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
         phenotypes = np.load('/projects/iktos/pierre/CondGeoLDM/data/jump/train_embeddings.npy',
         mmap_mode='r', 
@@ -178,7 +178,7 @@ def sample(args, device, generative_model, dataset_info,
         )
         print("WE ARE CONDITIONING YAY")
         if random_idx:
-            random_embedding_idx = torch.randint(0, phenotypes.shape(0), (batch_size,))
+            random_embedding_idx = torch.randint(0, phenotypes.shape[0], (batch_size,))
             phenotypes_to_sample_with = torch.from_numpy(phenotypes[random_embedding_idx].copy()).to(device)
         else:
             chosen_phen = torch.from_numpy(phenotypes[14].copy())

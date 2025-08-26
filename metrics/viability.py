@@ -12,12 +12,13 @@ import torch
 import tqdm
 import numpy as np
 import scipy.stats as sp_stats
+import warnings
 
 from qm9 import bond_analyze
 from joblib import Parallel, delayed
 from configs import datasets_config
 import qm9.dataset as dataset 
-
+from openbabel import pybel
 
 
 BOND_DICT = [None, Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE, Chem.rdchem.BondType.TRIPLE,
@@ -35,6 +36,86 @@ def mol2smiles(mol):
     return Chem.MolToSmiles(mol)
 
 
+def build_molecule_pybel(
+    positions, atom_types: list[int], charges= None, sanitize=True, dataset_info=None
+):
+    """FROM SEMLA FLOW
+    Create RDKit mol from atom coords and atom tokens (and optionally bonds)
+
+    This function will create a partial molecule using the atomics and coordinates and then
+    infer the bonds based on the coordinates using OpenBabel. 
+
+    If charges are not provided they are assumed to be 0 for all atoms.
+
+    Args:
+        positions (torch.tensor)): Coordinate tensor, shape [n_atoms, 3]
+        atom_types (torch.tensor]): Transformed from one_hot, length must be n_atoms
+        bonds (np.ndarray, optional): Bond indices and types, shape [n_bonds, 3]
+        charges (np.ndarray, optional): Charge for each atom, shape [n_atoms]
+        sanitise (bool): Whether to apply RDKit sanitization to the molecule, default True
+
+    Returns:
+        Chem.rdchem.Mol: RDKit molecule or None if one cannot be created
+    """
+    if not getattr(build_molecule_pybel, "_has_run", False):
+        print("Building RDKit mols using Obabel bond inference.")
+        build_molecule_pybel._has_run = True
+    coords=np.array(positions.tolist())  
+    atomic_nb = dataset_info['atomic_nb']
+    atomics = [int(atomic_nb[i]) for i in atom_types]
+
+    charges = charges.tolist() if charges is not None else [0] * len(atomics)
+
+    # Add atom types and charges
+    mol = Chem.EditableMol(Chem.Mol())
+    for idx, atomic in enumerate(atomics):
+        atom = Chem.Atom(atomic)
+        atom.SetFormalCharge(charges[idx])
+        mol.AddAtom(atom)
+
+    # Add 3D coords
+    conf = Chem.Conformer(coords.shape[0])
+    for idx, coord in enumerate(coords.tolist()):
+        conf.SetAtomPosition(idx, coord)
+
+    mol = mol.GetMol()
+    mol.AddConformer(conf)
+    
+    # Infer bonds with OpenBabel
+    coords = mol.GetConformer().GetPositions().tolist()
+    coord_strs = ["\t".join([f"{c:.6f}" for c in cs]) for cs in coords]
+    atom_symbols = [atom.GetSymbol() for atom in mol.GetAtoms()]
+
+    xyz_str_header = f"{str(mol.GetNumAtoms())}\n\n"
+    xyz_strs = [f"{str(atom)}\t{coord_str}" for coord_str, atom in zip(coord_strs, atom_symbols)]
+    xyz_str = xyz_str_header + "\n".join(xyz_strs)
+    for attempt in range(3):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            try:
+                pybel_mol = pybel.readstring("xyz", xyz_str)
+
+                pybel_mol.OBMol.ConnectTheDots()
+                pybel_mol.OBMol.PerceiveBondOrders()
+                pybel_mol.OBMol.SetAromaticPerceived(False)
+                pybel_mol.OBMol.SetHybridizationPerceived(False)
+                
+            # Add hydrogens for better bond inference
+                pybel_mol.addh()
+            except Exception:
+                print("OpenBabel failed to read xyz string: caught exception")
+                pybel_mol = None
+                if w is None:
+                    break
+    if pybel_mol is None:
+        print("OpenBabel failed to read xyz string: mol is None")
+        return None
+
+    mol_str = pybel_mol.write("mol")
+    mol = Chem.MolFromMolBlock(mol_str, removeHs=False, sanitize=sanitize, strictParsing=False)
+    return mol
+    
+    
 def build_molecule(positions, atom_types, dataset_info):
     atom_decoder = dataset_info["atom_decoder"]
     X, A, E = build_xae_molecule(positions, atom_types, dataset_info)
@@ -99,7 +180,11 @@ class BasicMolecularMetrics(object):
         connected = []
         valid_mols = []
         for graph in generated:
-            mol = build_molecule(*graph, self.dataset_info)
+            try:
+                mol = build_molecule_pybel(*graph, dataset_info=self.dataset_info)
+            except Exception as e:
+                print("Exception when building molecule:", e)
+                mol = None
             smiles = mol2smiles(mol)
             if smiles is not None:
                 mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True)
@@ -145,6 +230,7 @@ class BasicMolecularMetrics(object):
             unique = None
             connectivity = 0.0
         return [validity, uniqueness, novelty, connectivity], valid_mols
+    
     
 def check_stability(positions, atom_type, dataset_info, debug=False):
     assert len(positions.shape) == 2

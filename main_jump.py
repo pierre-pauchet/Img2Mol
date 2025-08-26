@@ -4,7 +4,7 @@
 # Rdkit import should be first, do not move it
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"  # Set CUDA_VISIBLE_DEVICES to use GPU 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"  # Set CUDA_VISIBLE_DEVICES to use GPU 
 
 try:
     from rdkit import Chem
@@ -219,7 +219,7 @@ utils.create_folders(args)
 if args.no_wandb:
     mode = "disabled"
 else:
-    mode = 'online' if online else 'offline'
+    mode = 'online' if args.online else 'offline'
 kwargs = {'entity': args.wandb_usr, 'name': args.exp_name, 'project': 'e3_diffusion', 'config': vars(args),
           'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': mode}
 wandb.init(**kwargs)
@@ -249,7 +249,7 @@ else:
         context_dummy = prepare_context(args.conditioning, data_dummy, property_norms)
         embeddings = prepare_embeddings(data_dummy, verbose=True)
         context_node_nf = embeddings.size(2)
-    elif args.conditioning_mode in ['cross_attention', 'other']: # Attention conditioning
+    elif args.conditioning_mode in ['attention', 'other']: # Attention conditioning
         context_node_nf = 0
         property_norms = None
     elif args.conditioning_mode in ['other']: # Attention conditioning
@@ -356,7 +356,7 @@ def main():
 
                 # save best model over previous best
                 if args.save_model:
-                    global_folder = io_path / 'outputs' / f'{args.exp_name}' / f'epoch_{epoch}'
+                    global_folder = io_path / 'outputs' / f'{args.exp_name}'  
                     global_folder.mkdir(parents=True, exist_ok=True)
                     args.current_epoch = epoch + 1
                     utils.save_model(optim, global_folder / 'flow.npy')
@@ -368,9 +368,8 @@ def main():
                         
             # save current model
             if args.save_model:
-                epoch_folder = io_path / 'outputs' / f'{args.exp_name}'
+                epoch_folder = io_path / 'outputs' / f'{args.exp_name}' / f'epoch_{epoch}_'
                 epoch_folder.mkdir(parents=True, exist_ok=True)
-
                 utils.save_model(optim, epoch_folder / 'optim.npy')
                 utils.save_model(model, epoch_folder / 'generative_model.npy')
                 if args.ema_decay > 0:

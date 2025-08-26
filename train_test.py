@@ -27,7 +27,7 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
         edge_mask = data["edge_mask"].to(device, dtype, non_blocking=True)
         one_hot = data["one_hot"].to(device, dtype, non_blocking=True)
         charges = (data["charges"].to(device, dtype, non_blocking=True) if args.include_charges else torch.zeros(0))
-        phenotypes = (data["embeddings"].to(device, non_blocking=True) if args.conditioning_mode == "cross_attention" else None)
+        phenotypes = data["embeddings"].to(device, non_blocking=True) if args.conditioning_mode == "attention" else None
         x = remove_mean_with_mask(x, node_mask)
 
         if args.augment_noise > 0:
@@ -93,12 +93,10 @@ def train_epoch(args, loader, epoch, model, model_dp, model_ema, ema, device, dt
             print("base_output", base_output_path)
             print("vis")
             vis.visualize(str(base_output_path), dataset_info=dataset_info, wandb=None)
-            print("vis_chain")
-            
-        #     vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=None)
-        #     if len(args.conditioning) > 0:
-        #         vis.visualize_chain("outputs/%s/epoch_%d/conditional/" % (args.exp_name, epoch), dataset_info,
-        #                             wandb=wandb, mode="conditional")
+            vis.visualize_chain(str(base_output_path / "chain"), dataset_info, wandb=None)
+            if len(args.conditioning) > 0:
+                vis.visualize_chain("outputs/%s/epoch_%d/conditional/" % (args.exp_name, epoch), dataset_info,
+                                    wandb=wandb, mode="conditional")
         wandb.log({"Batch NLL": nll.item()}, commit=True)
         wandb.log({"GradNorm": grad_norm}, commit=True)
         prof.step() if prof is not None else None
@@ -130,7 +128,7 @@ def test(args, loader, epoch, eval_model, device, dtype, property_norms, nodes_d
             edge_mask = data["edge_mask"].to(device, dtype)
             one_hot = data["one_hot"].to(device, dtype)
             charges = (data["charges"] if args.include_charges else torch.zeros(0)).to(device, dtype)
-            phenotypes = (data["embeddings"] if args.conditioning_mode == "cross_attention" else None)
+            phenotypes = data["embeddings"] if args.conditioning_mode == "attention" else None
             
 
             if args.augment_noise > 0:
