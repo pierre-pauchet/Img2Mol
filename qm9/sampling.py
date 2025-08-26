@@ -51,7 +51,7 @@ def reverse_tensor(x):
     return x[torch.arange(x.size(0) - 1, -1, -1)]
 
 
-def sample_chain(args, device, flow, n_tries, dataset_info, embeddings_file='/projects/iktos/pierre/CondGeoLDM/data/jump/',
+def sample_chain(args, device, flow, n_tries, dataset_info,
                  prop_dist=None, random_idx=True, n_samples=4):
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
@@ -74,7 +74,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, embeddings_file='/pr
         context = None
     if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the train loaders
-        path = Path(embeddings_file) / 'train_embeddings.npy'
+        path = args.datadir / 'train_embeddings.npy'
         phenotypes = np.load(str(path),
                 mmap_mode='r', 
                 allow_pickle=True
@@ -145,7 +145,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, embeddings_file='/pr
     return one_hot, charges, x, node_mask_final
 
 
-def sample(args, device, generative_model, dataset_info, embeddings_file='/projects/iktos/pierre/CondGeoLDM/data/jump/',
+def sample(args, device, generative_model, dataset_info,
            prop_dist=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
            fix_noise=False, random_idx=True):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
@@ -173,7 +173,7 @@ def sample(args, device, generative_model, dataset_info, embeddings_file='/proje
         context = None
     if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
-        path = Path(embeddings_file) / 'train_embeddings.npy'
+        path = args.datadir / 'train_embeddings.npy'
         phenotypes = np.load(str(path),
                         mmap_mode='r', 
                         allow_pickle=True
