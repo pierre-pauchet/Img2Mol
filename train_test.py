@@ -205,6 +205,7 @@ def analyze_and_save(epoch, model_sample, nodes_dist, args, device, dataset_info
     for i in tqdm.tqdm(range(int(n_samples / batch_size))):
         nodesxsample = nodes_dist.sample(batch_size)
         one_hot, charges, x, node_mask = sample(args, device, model_sample, dataset_info, prop_dist,
+                                                embeddings_file=args.datadir,
                                                 nodesxsample=nodesxsample,)
 
         molecules["one_hot"].append(one_hot.detach().cpu())

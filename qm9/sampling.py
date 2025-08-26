@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from equivariant_diffusion.utils import assert_mean_zero_with_mask, remove_mean_with_mask,\
     assert_correctly_masked
 from qm9.analyze import check_stability
-
+from pathlib import Path
 
 def rotate_chain(z):
     assert z.size(0) == 1
@@ -51,8 +51,8 @@ def reverse_tensor(x):
     return x[torch.arange(x.size(0) - 1, -1, -1)]
 
 
-def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None, 
-                 random_idx=True, n_samples=4):
+def sample_chain(args, device, flow, n_tries, dataset_info, embeddings_file='/projects/iktos/pierre/CondGeoLDM/data/jump/',
+                 prop_dist=None, random_idx=True, n_samples=4):
     if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
         n_nodes = 19
     elif args.dataset == 'geom' :
@@ -74,7 +74,8 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
         context = None
     if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the train loaders
-        phenotypes = np.load('/projects/iktos/pierre/CondGeoLDM/data/jump/train_embeddings.npy',
+        path = Path(embeddings_file) / 'train_embeddings.npy'
+        phenotypes = np.load(str(path),
                 mmap_mode='r', 
                 allow_pickle=True
                 )
@@ -144,7 +145,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None,
     return one_hot, charges, x, node_mask_final
 
 
-def sample(args, device, generative_model, dataset_info,
+def sample(args, device, generative_model, dataset_info, embeddings_file='/projects/iktos/pierre/CondGeoLDM/data/jump/',
            prop_dist=None, nodesxsample=torch.tensor([10]), context=None, phenotypes=None,
            fix_noise=False, random_idx=True):
     max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
@@ -172,10 +173,11 @@ def sample(args, device, generative_model, dataset_info,
         context = None
     if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
-        phenotypes = np.load('/projects/iktos/pierre/CondGeoLDM/data/jump/train_embeddings.npy',
-        mmap_mode='r', 
-        allow_pickle=True
-        )
+        path = Path(embeddings_file) / 'train_embeddings.npy'
+        phenotypes = np.load(str(path),
+                        mmap_mode='r', 
+                        allow_pickle=True
+                    )
         print("WE ARE CONDITIONING YAY")
         if random_idx:
             random_embedding_idx = torch.randint(0, phenotypes.shape[0], (batch_size,))
