@@ -74,7 +74,7 @@ def sample_chain(args, device, flow, n_tries, dataset_info,
         context = None
     if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the train loaders
-        path = args.datadir / 'train_embeddings.npy'
+        path = args.datadir + 'train_embeddings.npy'
         phenotypes = np.load(str(path),
                 mmap_mode='r', 
                 allow_pickle=True
@@ -173,7 +173,7 @@ def sample(args, device, generative_model, dataset_info,
         context = None
     if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
-        path = args.datadir / 'train_embeddings.npy'
+        path = args.datadir + 'train_embeddings.npy'
         phenotypes = np.load(str(path),
                         mmap_mode='r', 
                         allow_pickle=True
