@@ -36,8 +36,8 @@ class GCL(nn.Module):
                 num_heads=2, # Might play around with this later
                 dropout=0.1,
                 batch_first=True,
-                kdim=phen_nf,
-                vdim=phen_nf,
+                kdim=hidden_nf,
+                vdim=hidden_nf,
             )
             self.phenotype_mlp = nn.Linear(phen_nf, hidden_nf)
             self.layer_norm = nn.LayerNorm(hidden_nf)
