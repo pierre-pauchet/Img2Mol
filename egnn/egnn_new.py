@@ -39,7 +39,7 @@ class GCL(nn.Module):
                 kdim=phen_nf,
                 vdim=phen_nf,
             )
-            # self.phenotype_mlp = nn.Linear(phen_nf, hidden_nf)
+            self.phenotype_mlp = nn.Linear(phen_nf, hidden_nf)
             self.layer_norm = nn.LayerNorm(hidden_nf)
         
     def edge_model(self, source, target, edge_attr, edge_mask, phenotypes):
@@ -57,30 +57,31 @@ class GCL(nn.Module):
         if self.phen_nf>0:
             bs, _ = phenotypes.shape
             out_linear = out.view(bs, out.size(0)//bs, self.hidden_nf) # Reshape to bs, n_nodes*2, hidden_nf
-            # with proj mlp : 
-            # phenotypes_proj = self.phenotype_mlp(phenotypes)
-            # phenotypes_proj = phenotypes_proj.unsqueeze(1) # Reshape to bs, 1, hidden_nf
             
-            # attn_out, attn_weights = self.cross_attn_block(
-            #     query=out_linear, 
-            #     key= phenotypes_proj, 
-            #     value=phenotypes_proj) # X_Att between messages and phenotypes
-            
-            # out_linear = out_linear + attn_out
-            # out_linear = self.layer_norm(out_linear)
-            # out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
-            
-            # #without proj_mlp : 
-            phenotypes = phenotypes.unsqueeze(1) # Reshape to bs, 1, hidden_nf
+            #with proj mlp : 
+            phenotypes_proj = self.phenotype_mlp(phenotypes)
+            phenotypes_proj = phenotypes_proj.unsqueeze(1) # Reshape to bs, 1, hidden_nf
             
             attn_out, attn_weights = self.cross_attn_block(
                 query=out_linear, 
-                key= phenotypes, 
-                value=phenotypes) # X_Att between messages and phenotypes
+                key= phenotypes_proj, 
+                value=phenotypes_proj) # X_Att between messages and phenotypes
             
             out_linear = out_linear + attn_out
             out_linear = self.layer_norm(out_linear)
             out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
+            
+            # #without proj_mlp : 
+            # phenotypes = phenotypes.unsqueeze(1) # Reshape to bs, 1, hidden_nf
+            
+            # attn_out, attn_weights = self.cross_attn_block(
+            #     query=out_linear, 
+            #     key= phenotypes, 
+            #     value=phenotypes) # X_Att between messages and phenotypes
+            
+            # out_linear = out_linear + attn_out
+            # out_linear = self.layer_norm(out_linear)
+            # out = out_linear.view(-1, self.hidden_nf) # Reshape back to original shape
             
         if edge_mask is not None:
             out = out * edge_mask
