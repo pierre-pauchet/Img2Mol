@@ -318,7 +318,6 @@ def main():
         model_ema_dp = model_dp
 
     best_nll_val = 1e10
-    # best_nll_test = 1e1
     
     ## Profiling 
     # profiler(args=args, loader=dataloaders["train"], epoch=0, model=model, model_dp=model_dp,
