@@ -325,12 +325,13 @@ def main():
 
     # 3. Compute Viability metrics
     molecules_list = graph_to_mol_list(one_hot=one_hot, charges=charges, x=x, node_mask=node_mask)
-    
+    # TODO : raename fn for clarity : it outputs a list of xyz graphs 
     stability_dict, rdkit_metrics, rdkit_mols = analyze_stability_for_molecules(
         molecules_list, 
         dataset_info,
         parallel=True
     )
+    print(stability_dict)
 # TODO : rewrite analyze_stability_for_molecules so that it is not needed and 
 # the preprocess is done by a previous function.
 # Ideally, i want #3 to just be graph to mol, check_stability, metrics.evaluate

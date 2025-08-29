@@ -267,7 +267,6 @@ def compute_stacked_umap(fingerprints_list, labels, save_path, title='', n_neigh
             ax.grid(alpha=0.3)
         else:
             ax.axis('off')  # Empty subplot
-    # Super titre unique
     fig.suptitle(title, fontsize=14)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # la place pour le suptitle
     plt.savefig(save_path, dpi=300)

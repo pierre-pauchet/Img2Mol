@@ -113,7 +113,7 @@ def build_molecule_pybel(
 
     mol_str = pybel_mol.write("mol")
     mol = Chem.MolFromMolBlock(mol_str, removeHs=False, sanitize=sanitize, strictParsing=False)
-    return mol
+    return mol, mol_str
     
     
 def build_molecule(positions, atom_types, dataset_info):
@@ -154,7 +154,7 @@ def build_xae_molecule(positions, atom_types, dataset_info):
             if dataset_info['name'] == 'qm9' or dataset_info['name'] == 'qm9_second_half' or dataset_info['name'] == 'qm9_first_half':
                 order = bond_analyze.get_bond_order(atom_decoder[pair[0]], atom_decoder[pair[1]], dists[i, j])
             elif dataset_info['name'] == 'geom' or dataset_info['name'] == 'jump':
-                order = bond_analyze.geom_predictor((atom_decoder[pair[0]], atom_decoder[pair[1]]), dists[i, j], limit_bonds_to_one=True)
+                order = bond_analyze.geom_predictor((atom_decoder[pair[0]], atom_decoder[pair[1]]), dists[i, j], limit_bonds_to_one=False)
             # TODO: a batched version of get_bond_order to avoid the for loop
             if order > 0:
                 # Warning: the graph should be DIRECTED
@@ -181,12 +181,14 @@ class BasicMolecularMetrics(object):
         valid_mols = []
         for graph in generated:
             try:
-                mol = build_molecule_pybel(*graph, dataset_info=self.dataset_info)
+                mol, _ = build_molecule_pybel(*graph, dataset_info=self.dataset_info,
+                                           sanitize=True)
+                # smiles = mol2smiles(mol)
             except Exception as e:
                 print("Exception when building molecule:", e)
                 mol = None
-            smiles = mol2smiles(mol)
-            if smiles is not None:
+                
+            if mol is not None:
                 mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True)
                 if len(mol_frags) == 1:
                     connected.append(True)

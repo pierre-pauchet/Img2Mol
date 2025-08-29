@@ -41,9 +41,9 @@ bonds1 = {'H': {'H': 74, 'C': 109, 'N': 101, 'O': 96, 'F': 92,
 
 bonds2 = {'C': {'C': 134, 'N': 129, 'O': 120, 'S': 160},
           'N': {'C': 129, 'N': 125, 'O': 121},
-          'O': {'C': 120, 'N': 121, 'O': 121, 'P': 150, 'S': 149},
+          'O': {'C': 120, 'N': 121, 'O': 121, 'P': 150},
           'P': {'O': 150, 'S': 186},
-          'S': {'P': 186, 'O': 149}}
+          'S': {'P': 186}}
 
 
 bonds3 = {'C': {'C': 120, 'N': 116, 'O': 113},
@@ -158,7 +158,7 @@ def single_bond_only(threshold, length, margin1=5):
     return 0
 
 
-def geom_predictor(p, l, margin1=5, limit_bonds_to_one=False):
+def geom_predictor(p, l, margin1=5, limit_bonds_to_one=True):
     """ p: atom pair (couple of str)
         l: bond length (float)"""
     bond_order = get_bond_order(p[0], p[1], l, check_exists=True)

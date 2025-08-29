@@ -73,8 +73,8 @@ def sample_chain(args, device, flow, n_tries, dataset_info,
     else:
         context = None
     if args.conditioning_mode == 'attention':
-        # samples phenotypes for cross-attention conditioning from the train loaders
-        path = args.datadir + 'train_embeddings.npy'
+        path = Path(args.datadir) / args.data_file
+        path = path.parent / 'train_embeddings.npy'
         phenotypes = np.load(str(path),
                 mmap_mode='r', 
                 allow_pickle=True
@@ -173,7 +173,8 @@ def sample(args, device, generative_model, dataset_info,
         context = None
     if args.conditioning_mode == 'attention':
         # samples phenotypes for cross-attention conditioning from the test loaders
-        path = args.datadir + 'train_embeddings.npy'
+        path = Path(args.datadir) / args.data_file
+        path = path.parent / 'train_embeddings.npy'
         phenotypes = np.load(str(path),
                         mmap_mode='r', 
                         allow_pickle=True
@@ -185,12 +186,13 @@ def sample(args, device, generative_model, dataset_info,
         else:
             chosen_phen = torch.from_numpy(phenotypes[14].copy())
             phenotypes_to_sample_with = chosen_phen.repeat(batch_size, 1).to(device)  
+        phenotypes = phenotypes_to_sample_with
     else:
         phenotypes = None
     
     if args.probabilistic_model == 'diffusion':
         x, h = generative_model.sample(batch_size, max_n_nodes, node_mask, edge_mask, context, 
-                                       phenotypes_to_sample_with, fix_noise=fix_noise)
+                                       phenotypes, fix_noise=fix_noise)
 
         assert_correctly_masked(x, node_mask)
         assert_mean_zero_with_mask(x, node_mask)
